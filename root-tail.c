@@ -60,10 +60,12 @@ struct logfile_entry
 struct linematrix
 {
   char *line;
+  int len;
   unsigned long color;
 };
 
 /* global variables */
+struct linematrix *lines;
 int width = STD_WIDTH, height = STD_HEIGHT, listlen;
 int win_x = LOC_X, win_y = LOC_Y;
 int font_descent, font_height;
@@ -104,14 +106,14 @@ void blank_window (int);
 void InitWindow (void);
 unsigned long GetColor (const char *);
 void redraw (void);
-void refresh (struct linematrix *, int, int);
+void refresh (int, int);
 
 void transform_line (char *s);
 int lineinput (struct logfile_entry *);
 void reopen (void);
 void check_open_files (void);
 FILE *openlog (struct logfile_entry *);
-void main_loop (void);
+static void main_loop (void);
 
 void display_version (void);
 void display_help (char *);
@@ -140,7 +142,6 @@ force_reopen (int dummy)
 void
 force_refresh (int dummy)
 {
-  XClearArea (disp, root, win_x, win_y, width, height, False);
   redraw ();
 }
 
@@ -308,28 +309,6 @@ InitWindow (void)
   XSelectInput (disp, root, ExposureMask | FocusChangeMask);
 }
 
-char *
-detabificate (char *s)
-{
-  char *out;
-  int i, j;
-
-  out = malloc (8 * strlen (s) + 1);
-
-  for (i = 0, j = 0; s[i]; i++)
-    {
-      if (s[i] == '\t')
-        do
-          out[j++] = ' ';
-        while (j % 8);
-      else
-        out[j++] = s[i];
-    }
-
-  out[j] = '\0';
-  return out;
-}
-
 /*
  * redraw does a complete redraw, rather than an update (i.e. the area
  * gets cleared first)
@@ -338,12 +317,13 @@ detabificate (char *s)
 void
 redraw (void)
 {
-  XClearArea (disp, root, win_x, win_y, width, height, True);
+  XClearArea (disp, root, win_x, win_y, width, height, False);
+  refresh (0, 32768);
 }
 
 /* Just redraw everything without clearing (i.e. after an EXPOSE event) */
 void
-refresh (struct linematrix *lines, int miny, int maxy)
+refresh (int miny, int maxy)
 {
   int lin;
   int offset = (listlen + 1) * font_height;
@@ -352,10 +332,10 @@ refresh (struct linematrix *lines, int miny, int maxy)
   miny -= win_y + font_height;
   maxy -= win_y - font_height;
 
+
   for (lin = listlen; lin--;)
     {
-      struct linematrix *line =
-        lines + (opt_reverse ? listlen - lin - 1 : lin);
+      struct linematrix *line = lines + (opt_reverse ? listlen - lin - 1 : lin);
 
       offset -= font_height;
 
@@ -366,16 +346,16 @@ refresh (struct linematrix *lines, int miny, int maxy)
         {
           XSetForeground (disp, WinGC, black_color);
           XmbDrawString (disp, root, fontset, WinGC, win_x + 2,
-                         win_y + offset + 2, line->line, strlen (line->line));
+                         win_y + offset + 2, line->line, line->len);
         }
 
       XSetForeground (disp, WinGC, line->color);
       XmbDrawString (disp, root, fontset, WinGC, win_x, win_y + offset,
-                     line->line, strlen (line->line));
+                     line->line, line->len);
     }
 
   if (opt_frame)
-    XDrawRectangle (disp, root, WinGC, win_x, win_y, width, height);
+    XDrawRectangle (disp, root, WinGC, win_x - 2, win_y - 2, width + 4, height + 4);
 }
 
 #if HAS_REGEX
@@ -405,54 +385,74 @@ transform_line (char *s)
 }
 #endif
 
+char *
+concat_line (const char *p1, const char *p2)
+{
+  int l1 = p1 ? strlen (p1) : 0;
+  int l2 = strlen (p2);
+  char *r = xmalloc (l1 + l2 + 1);
+
+  memcpy (r, p1, l1);
+  memcpy (r + l1, p2, l2);
+  r[l1 + l2] = 0;
+
+  return r;
+}
 
 /*
- * This routine should read 'width' characters and not more. However,
- * we really want to read width + 1 characters if the last char is a '\n',
- * which we should remove afterwards. So, read width+1 chars and ungetc
- * the last character if it's not a newline. This means 'string' must be
- * width + 2 wide!
+ * This routine should read a single line, no matter how long.
  */
 int
 lineinput (struct logfile_entry *logfile)
 {
-  char *string = logfile->buf;
-  int slen = width + 2;
-  FILE *f = logfile->fp;
-
-  int len = strlen (string);
-  int partial = logfile->partial;
+  char buff[1024], *p = buff;
+  int ch;
+  int ofs = logfile->buf ? strlen (logfile->buf) : 0;
 
   do
     {
-      if (fgets (string + len, slen - len, f) == NULL)  /* EOF or Error */
-        return 0;
+      ch = fgetc (logfile->fp);
 
-      len = strlen (string);
+      if (ch == '\r')
+        continue;
+      else if (ch == EOF || ch == '\n')
+        break;
+      else if (ch == '\t')
+        {
+          do
+            {
+              *p++ = ' ';
+              ofs++;
+            }
+          while (ofs & 7);
+        }
+      else
+        {
+          *p++ = ch;
+          ofs++;
+        }
     }
-  while (len == 0);
+  while (p < buff + (sizeof buff) - 8 - 1);
 
-  logfile->partial = 0;
-
-  if (string[len - 1] == '\n')
-    /* if the string ends in a newline, delete the newline */
-    string[len - 1] = '\0';     /* erase newline */
-  else if (len >= slen - 1)
-    {
-      /* otherwise if we've read one too many characters, un-read the last one and delete it */
-      ungetc (string[len - 1], f);
-      string[len - 1] = '\0';
-    }
-  else if (opt_whole)
+  if (p == buff)
     return 0;
-  else
-    logfile->partial = 1;
+
+  *p = 0;
+
+  p = concat_line (logfile->buf, buff);
+  free (logfile->buf); logfile->buf = p;
+
+  logfile->lastpartial = logfile->partial;
+  logfile->partial = ch == EOF;
+  
+  if (logfile->partial && opt_whole)
+    return 0;
 
 #if HAS_REGEX
-  transform_line (string);
+  transform_line (logfile->buf);
 #endif
-  logfile->lastpartial = partial;
-  return len;
+  printf ("got buf <%s>\n", logfile->buf);
+  return 1;
 }
 
 /* input: reads file->fname
@@ -545,23 +545,95 @@ check_open_files (void)
     }
 }
 
-#define SCROLL_UP(lines, listlen)                            \
-{                                                        \
-    int cur_line;                                          \
-    struct logfile_entry *current;                            \
-    for (cur_line = 0; cur_line < (listlen - 1); cur_line++) {       \
-       strcpy(lines[cur_line].line, lines[cur_line + 1].line);       \
-       lines[cur_line].color = lines[cur_line + 1].color;       \
-    }                                                        \
-    for (current = loglist; current; current = current->next)       \
-       if (current->partial && current->index)                     \
-           current->index--;                                   \
+static void
+insert_line (int idx)
+{
+  int cur_line;
+  struct logfile_entry *current;
+
+  free (lines[0].line);
+
+  for (cur_line = 0; cur_line < idx; cur_line++)
+    lines[cur_line] = lines[cur_line + 1];
+
+  for (current = loglist; current; current = current->next)
+    if (current->partial && current->index && current->index <= idx)
+      current->index--;
 }
 
-void
+static void
+delete_line (int idx)
+{
+  int cur_line;
+  struct logfile_entry *current;
+
+  for (cur_line = idx; cur_line > 0; cur_line--)
+    lines[cur_line] = lines[cur_line - 1];
+
+  lines[0].line = strdup ("~");
+
+  for (current = loglist; current; current = current->next)
+    if (current->partial && current->index && current->index <= idx)
+      current->index++;
+}
+
+static void
+split_line (int idx, const char *str, unsigned long color)
+{
+  int l = strlen (str);
+  const char *p = str;
+
+  do
+    {
+      const char *beg = p;
+      int w = 0;
+
+      while (*p)
+        {
+          int len = mblen (p, l);
+          if (len <= 0)
+            len = 1; /* ignore (don't skip) ilegal character sequences */
+
+          int cw = XmbTextEscapement (fontset, p, len);
+          if (cw + w >= width)
+            break;
+
+          w += cw;
+          p += len;
+          l -= len;
+        }
+
+      {
+        char *s = xmalloc (p - beg + 1);
+        memcpy (s, beg, p - beg);
+        s[p - beg] = 0;
+        insert_line (idx);
+        lines[idx].line = s;
+        lines[idx].len = p - beg;
+        lines[idx].color = color;
+      }
+    }
+  while (l);
+}
+
+static void
+append_line (int idx, const char *str)
+{
+  unsigned long color = lines[idx].color;
+  char *old = lines[idx].line;
+  char *new = concat_line (old, str);
+
+  free (old);
+  free (str);
+
+  delete_line (idx);
+  split_line (idx, new, color);
+}
+
+static void
 main_loop (void)
 {
-  struct linematrix *lines = xmalloc (sizeof (struct linematrix) * listlen);
+  lines = xmalloc (sizeof (struct linematrix) * listlen);
   int lin, miny, maxy;
   time_t lastreload;
   Region region = XCreateRegion ();
@@ -576,8 +648,8 @@ main_loop (void)
   /* Initialize linematrix */
   for (lin = 0; lin < listlen; lin++)
     {
-      lines[lin].line = xmalloc (width + 2);
-      strcpy (lines[lin].line, "~");
+      lines[lin].line = strdup ("~");
+      lines[lin].len = 1;
       lines[lin].color = GetColor (def_color);
     }
 
@@ -599,102 +671,61 @@ main_loop (void)
 
           clearerr (current->fp);
 
-          while (lineinput (current) != 0)
+          while (lineinput (current))
             {
+             printf ("lineinput %s\n", current->buf);//D
+              need_update = 1;
               /* if we're trying to update old partial lines in
                * place, and the last time this file was updated the
                * output was partial, and that partial line is not
                * too close to the top of the screen, then update
                * that partial line */
+              printf ("BPa\n");//D
               if (opt_update && current->lastpartial && current->index >= 3)
                 {
-                  int old_len = strlen (lines[current->index].line);
-                  int new_len = strlen (current->buf);
-                  int space_on_old_line = width / font_width - old_len; //D
+                  append_line (current->index, current->buf);
 
-                  strncat (lines[current->index].line, current->buf,
-                           width - old_len);
-                  /* if we can't fit the whole update into the old
-                   * partial line then we're going to have to print
-                   * the rest of it at the bottom on the screen */
-                  if (new_len > space_on_old_line)
+                  if (!current->partial)
                     {
-                      /* strcpy() doesn't like the strings to
-                       * overlap in memory, but memmove() doesn't
-                       * care */
-                      memmove (current->buf,
-                               current->buf + space_on_old_line,
-                               new_len - space_on_old_line + 1);
+                      free (current->buf);
+                      current->buf = 0;
                     }
-                  else
-                    {
-                      need_update = 1;
-                      strcpy (current->buf, "");
-                      continue;
-                    }
+
+                  continue;
                 }
 
+              printf ("BPb\n");//D
               /* print filename if any, and if last line was from
                * different file */
               if (!opt_nofilename &&
                   lastprinted != current && current->desc[0])
                 {
-                  SCROLL_UP (lines, listlen);
-                  sprintf (lines[listlen - 1].line, "[%s]", current->desc);
-                  lines[listlen - 1].color = current->color;
+                  char buf[1024]; /* HACK */
+                  snprintf (buf, sizeof (buf), "[%s]", current->desc);
+              printf ("BPc<%s>\n", buf);//D
+                  split_line (listlen - 1, buf, current->color);
                 }
 
+              printf ("BP1\n");//D
               /* if this is the same file we showed last, and the
                * last time we showed it, it wasn't finished, then
                * append to the last line shown */
               if (lastprinted == current && current->lastpartial)
                 {
-                  int old_len = strlen (lines[listlen - 1].line);
-                  int new_len = strlen (current->buf);
-                  strncat (lines[listlen - 1].line, current->buf,
-                           width - old_len);
-                  /* if it doesn't all fit, then put the part that
-                   * doesn't fit on a new line */
-                  if (new_len > width - old_len)
-                    {
-                      SCROLL_UP (lines, listlen);
-                      strcpy (lines[listlen - 1].line,
-                              current->buf + width - old_len);
-                    }
-                  /* show the 'continuation' string because we've got a
-                   * continued partial line, but we weren't able to
-                   * append it to the old displayed partial line */
-                }
-              else if (current->lastpartial)
-                {
-                  int old_len = strlen (continuation);
-                  int new_len = strlen (current->buf);
-                  SCROLL_UP (lines, listlen);
-                  strcpy (lines[listlen - 1].line, continuation);
-                  strncat (lines[listlen - 1].line, current->buf,
-                           width - old_len);
-                  /* it might not fit, now that we've displayed the
-                   * continuation string, so we may need to 'wrap' it */
-                  if (new_len > width - old_len)
-                    {
-                      SCROLL_UP (lines, listlen);
-                      strcpy (lines[listlen - 1].line,
-                              current->buf + width - old_len);
-                    }
+                  append_line (listlen - 1, current->buf);
+                  free (current->buf);
+                  current->buf = 0;
+                  continue;
                 }
               else
                 {
-                  SCROLL_UP (lines, listlen);
-                  strcpy (lines[listlen - 1].line, current->buf);
+                  split_line (listlen - 1, current->buf, current->color);
+                  free (current->buf); current->buf = 0;
                 }
+              printf ("BP3\n");//D
 
-              /* we've shown the line now.  clear the buffer for the next line */
-              strcpy (current->buf, "");
               current->index = listlen - 1;
-              lines[listlen - 1].color = current->color;
-
               lastprinted = current;
-              need_update = 1;
             }
         }
 
@@ -764,7 +795,7 @@ main_loop (void)
         {
           XSetRegion (disp, WinGC, region);
 
-          refresh (lines, miny, maxy);
+          refresh (miny, maxy);
           XDestroyRegion (region);
           region = XCreateRegion ();
           maxy = 0;
@@ -882,6 +913,9 @@ main (int argc, char *argv[])
             }
 
           e = xmalloc (sizeof (struct logfile_entry));
+          e->partial = 0;
+          e->buf = 0;
+
           if (arg[0] == '-' && arg[1] == '\0')
             {
               if ((e->fp = fdopen (0, "r")) == NULL)
@@ -909,9 +943,7 @@ main (int argc, char *argv[])
             }
 
           e->color = GetColor (fcolor);
-          e->buf = xmalloc (width + 2);
           e->partial = 0;
-          e->buf[0] = '\0';
           e->next = NULL;
 
           if (!loglist)
@@ -1013,6 +1045,7 @@ xmalloc (size_t size)
       fprintf (stderr, "Memory exausted.");
       sleep (10);
     }
+
   return p;
 }
 
