@@ -77,6 +77,7 @@ struct displaymatrix
   char *line;
   int len;
   int buffer_size;
+  unsigned long color;
 };
 
 /* global variables */
@@ -406,6 +407,7 @@ refresh (int miny, int maxy, int clear, int refresh_all)
       if (!opt_noflicker
 	  || refresh_all
           || display_line->len != line->len
+          || display_line->color != line->color
           || memcmp (display_line->line, line->line, line->len))
         {
 	  /* don't bother updating the record of what has been
@@ -422,6 +424,7 @@ refresh (int miny, int maxy, int clear, int refresh_all)
 		}
 
 	      display_line->len = line->len;
+	      display_line->color = line->color;
 	      memcpy (display_line->line, line->line, line->len);
 
 	      if (clear)
