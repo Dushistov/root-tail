@@ -235,7 +235,6 @@ find_root_window (Display *display, int screen_number)
     {
       Atom SWM_VROOT = XInternAtom (display, "__SWM_VROOT", False);
       Atom NAUTILUS_DESKTOP_WINDOW_ID = XInternAtom (display, "NAUTILUS_DESKTOP_WINDOW_ID", False);
-      root = RootWindow (display, screen_number);
 
       Window unused, *windows = 0;
       unsigned int count;
@@ -244,6 +243,8 @@ find_root_window (Display *display, int screen_number)
       int format;
       unsigned long nitems, bytes_after_return;
       unsigned char *virtual_root_window;
+
+      root = RootWindow (display, screen_number);
 
       if (XGetWindowProperty (display, root, NAUTILUS_DESKTOP_WINDOW_ID,
                               0, 1, False, XA_WINDOW, &type, &format,
