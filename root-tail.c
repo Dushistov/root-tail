@@ -655,11 +655,11 @@ transform_line (char *s)
 char *
 concat_line (char *p1, const char *p2)
 {
-  assert(p2);
-
   int l1 = p1 ? strlen (p1) : 0;
   int l2 = strlen (p2);
   char *r;
+
+  assert (p2);
 
   if (p1)
     r = xrealloc(p1, l1 + l2 + 1);
@@ -925,6 +925,8 @@ possibly_split_long_line (struct logfile_entry *log)
       int wrapped = 0;
       char *break_p = NULL;
       int width_at_break_p = 0;
+      int prefix_len;
+
       spaces = 0;
 
       if (opt_justify)
@@ -991,8 +993,6 @@ possibly_split_long_line (struct logfile_entry *log)
        * the first character on the line, then wrap at the space */
       if (!wrapped)
         break;
-
-      int prefix_len;
 
       /* choose where to break the line */
       if (opt_wordwrap && break_p && break_p != beg)

@@ -1,5 +1,6 @@
 1.2
 	- accept hexadecimal window ids, as does everybody else(?).
+        - made it compile with ansi-89-based compilers again.
 
 1.1  Thu Apr  8 21:59:35 CEST 2004
         - make it work with virtual root windows (again).
