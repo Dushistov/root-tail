@@ -733,12 +733,24 @@ static void
 split_line (int idx, const char *str, unsigned long color)
 {
   int l = strlen (str);
+  int last_wrapped = 0;
   const char *p = str;
+  static int continuation_width = -1;
+  static int continuation_length;
+
+  /* only calculate the continuation's width once */
+  if (continuation_width == -1)
+    {
+      continuation_length = strlen(continuation);
+      continuation_width = XmbTextEscapement (fontset, continuation, continuation_length);
+      printf("continuation width is %d and length is %d\n", continuation_width, continuation_length);
+    }
 
   do
     {
       const char *beg = p;
-      int w = 0, wrapped = 0;
+      int w = last_wrapped ? continuation_width : 0;
+      int wrapped = 0;
       const char *break_p = NULL;
 
       while (*p)
@@ -776,12 +788,20 @@ split_line (int idx, const char *str, unsigned long color)
       {
 	/* HACK-4 - consider inserting the 'continuation string'
 	 * before the rest of the wrapped line */
-        char *s = xmalloc (p - beg + 1);
-        memcpy (s, beg, p - beg);
-        s[p - beg] = 0;
+	int len = p - beg + (last_wrapped ? continuation_length : 0);
+        char *s = xmalloc (len + 1);
+	if (last_wrapped)
+	  {
+	    memcpy (s, continuation, continuation_length);
+	    memcpy (s + continuation_length, beg, p - beg);
+	  }
+	else
+	    memcpy (s, beg, len);
+
+        s[len] = 0;
         insert_line (idx);
         lines[idx].line = s;
-        lines[idx].len = p - beg;
+        lines[idx].len = len;
         lines[idx].color = color;
       }
 
@@ -791,6 +811,8 @@ split_line (int idx, const char *str, unsigned long color)
 	  l--;
 	  p++;
 	}
+
+      last_wrapped = wrapped;
     }
   while (l);
 }
