@@ -764,6 +764,13 @@ split_line (int idx, const char *str, unsigned long color)
           int cw = XmbTextEscapement (fontset, p, len);
           if (cw + w > width - effect_x_space)
 	    {
+	      if (p == beg)
+		{
+		  fprintf(stderr, "we can't even fit a single character onto the line\n");
+		  if (len == 1) fprintf(stderr, "(the character we couldn't fit was '%c')\n", *p);
+		  exit(1);
+		}
+
 	      wrapped = 1;
 	      break;
 	    }
