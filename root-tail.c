@@ -873,17 +873,25 @@ main_loop (void)
                   split_line (listlen - 1, buf, current->color);
                 }
 
-              /* if this is the same file we showed last, and the
-               * last time we showed it, it wasn't finished, then
-               * append to the last line shown */
-              if (lastprinted == current && current->lastpartial)
-		append_line (listlen - 1, current->buf);
-              else if (current->lastpartial)
+              /* if we're dealing with partial lines, and the last
+               * time we showed the line it wasn't finished ... */
+              if (!opt_whole && current->lastpartial)
 		{
-                  split_line (listlen - 1, continuation, current->color);
-                  append_line (listlen - 1, current->buf);
+		  /* if this is the same file we showed last then
+		     append to the last line shown */
+		  if (lastprinted == current)
+		    append_line (listlen - 1, current->buf);
+		  else
+		    {
+		      /* but if a different file has been shown in the
+		       * mean time, make a new line, starting with the
+		       * continuation string */
+		      split_line (listlen - 1, continuation, current->color);
+		      append_line (listlen - 1, current->buf);
+		    }
 		}
               else
+		/* otherwise just make a plain and simple new line */
 		split_line (listlen - 1, current->buf, current->color);
 
 	      free (current->buf), current->buf = 0;
@@ -1155,7 +1163,7 @@ main (int argc, char *argv[])
     /* if we specifically requested to see partial lines then don't insist on whole lines */
     opt_whole = 0;
   else if (file_count > 1)
-    /* otherwise, if we've viewing multiple files, default to showing whole lines */
+    /* otherwise, if we're viewing multiple files, default to showing whole lines */
     opt_whole = 1;
 
 #if HAS_REGEX
