@@ -68,6 +68,7 @@ struct logfile_entry
   ino_t inode;                  /* inode of the file opened                     */
   off_t last_size;              /* file size at the last check                  */
   unsigned long color;          /* color to be used for printing                */
+  const char *colorname;        /* color name/string                            */
   int partial;                  /* true if the last line isn't complete         */
   int lastpartial;              /* true if the previous output wasn't complete  */
   struct line_node *last;       /* last line we output                          */
@@ -124,7 +125,7 @@ struct timeval interval = { 2, 400000 };
 /* command line options */
 int opt_noinitial, opt_shade, opt_frame, opt_reverse, opt_nofilename,
   opt_outline, opt_noflicker, opt_whole, opt_update, opt_wordwrap,
-  opt_justify, geom_mask, reload = 0;
+  opt_justify, geom_mask, opt_minspace, reload;
 const char *command = NULL,
   *fontname = USE_FONT, *dispname = NULL, *def_color = DEF_COLOR,
   *continuation = "|| ", *cont_color = DEF_CONT_COLOR;
@@ -133,9 +134,6 @@ struct logfile_entry *loglist = NULL, *loglist_tail = NULL;
 
 Display *disp;
 Window root;
-#ifdef USE_TOON_GET_ROOT_WINDOW
-Window real_root;
-#endif /* USE_TOON_GET_ROOT_WINDOW */
 GC WinGC;
 
 #if HAS_REGEX
@@ -218,11 +216,7 @@ GetColor (const char *ColorName)
   XColor Color;
   XWindowAttributes Attributes;
 
-#ifdef USE_TOON_GET_ROOT_WINDOW
-  XGetWindowAttributes (disp, real_root, &Attributes);
-#else /* USE_TOON_GET_ROOT_WINDOW */
   XGetWindowAttributes (disp, root, &Attributes);
-#endif /* USE_TOON_GET_ROOT_WINDOW */
   Color.pixel = 0;
 
   if (!XParseColor (disp, Attributes.colormap, ColorName, &Color))
@@ -234,67 +228,57 @@ GetColor (const char *ColorName)
 }
 
 #ifndef USE_TOON_GET_ROOT_WINDOW
-static Window
-root_window (Display * display, int screen_number)
+static void
+find_root_window (Display *display, int screen_number)
 {
-  Atom SWM_VROOT = XInternAtom (display, "__SWM_VROOT", False);
-  Window real_root_window = RootWindow (display, screen_number);
-
-  if (root)                     /* root window set via option */
-    return root;
-
-  if (SWM_VROOT != None)
+  if (!root)
     {
-      Window unused, *windows;
+      Atom SWM_VROOT = XInternAtom (display, "__SWM_VROOT", False);
+      Atom NAUTILUS_DESKTOP_WINDOW_ID = XInternAtom (display, "NAUTILUS_DESKTOP_WINDOW_ID", False);
+      root = RootWindow (display, screen_number);
+
+      Window unused, *windows = 0;
       unsigned int count;
 
-      if (XQueryTree (display, real_root_window, &unused, &unused, &windows, &count))
+      Atom type;
+      int format;
+      unsigned long nitems, bytes_after_return;
+      unsigned char *virtual_root_window;
+
+      if (XGetWindowProperty (display, root, NAUTILUS_DESKTOP_WINDOW_ID,
+                              0, 1, False, XA_WINDOW, &type, &format,
+                              &nitems, &bytes_after_return,
+                              &virtual_root_window) == Success
+          && type == XA_WINDOW)
+        {
+          if (XQueryTree (display, *(Window *)virtual_root_window, &unused, &unused, &windows, &count))
+            root = windows[count - 1];
+
+          XFree (virtual_root_window);
+        }
+      else if (XQueryTree (display, root, &unused, &unused, &windows, &count))
         {
           int i;
 
           for (i = 0; i < count; i++)
             {
-              Atom type;
-              int format;
-              unsigned long nitems, bytes_after_return;
-              unsigned char *virtual_root_window;
-
               if (XGetWindowProperty (display, windows[i], SWM_VROOT,
                                       0, 1, False, XA_WINDOW, &type, &format,
                                       &nitems, &bytes_after_return,
-                                      &virtual_root_window) == Success)
+                                      &virtual_root_window) == Success
+                   && type == XA_WINDOW)
                 {
-                  if (type != None)
-                    {
-                      if (type == XA_WINDOW)
-                        {
-                          root = *(Window *)virtual_root_window;
-                          XFree (windows);
-                          XFree (virtual_root_window);
-                          return root;
-                        }
-                      else
-                        fprintf (stderr, "__SWM_VROOT property type mismatch");
-                    }
+                  root = *(Window *)virtual_root_window;
+                  XFree (virtual_root_window);
+                  break;
                 }
-              else
-                fprintf (stderr,
-                         "failed to get __SWM_VROOT property on window 0x%lx",
-                         windows[i]);
             }
 
-          if (count)
-            XFree (windows);
+          XFree (windows);
         }
       else
-        fprintf (stderr, "Can't query tree on root window 0x%lx",
-                 real_root_window);
+        fprintf (stderr, "Can't query tree on root window 0x%lx", root);
     }
-  else
-    /* This shouldn't happen. The Xlib documentation is wrong BTW. */
-    fprintf (stderr, "Can't intern atom __SWM_VROOT");
-
-  return real_root_window;
 }
 #endif /* USE_TOON_GET_ROOT_WINDOW */
 
@@ -316,17 +300,13 @@ InitWindow (void)
   ScreenHeight = DisplayHeight (disp, screen);
   ScreenWidth = DisplayWidth (disp, screen);
 
-#ifdef USE_TOON_GET_ROOT_WINDOW
-  real_root = RootWindow(disp, screen);
-  root = ToonGetRootWindow( disp, screen, &real_root );
-#else /* USE_TOON_GET_ROOT_WINDOW */
-  root = root_window (disp, screen);
-#endif /* USE_TOON_GET_ROOT_WINDOW */
+  find_root_window (disp, screen);
 
   gcm = GCBackground;
   gcv.graphics_exposures = True;
   WinGC = XCreateGC (disp, root, gcm, &gcv);
   XMapWindow (disp, root);
+
   XSetForeground (disp, WinGC, GetColor (DEF_COLOR));
 
   for (e = loglist; e; e = e->next)
@@ -366,7 +346,7 @@ InitWindow (void)
   if (geom_mask & YNegative)
     win_y = win_y + ScreenHeight - height;
 
-  if (opt_outline)
+  if (opt_outline && !opt_minspace)
     {
       /* adding outline increases the total width and height by 2
          pixels each, and offsets the text one pixel right and one
@@ -374,7 +354,7 @@ InitWindow (void)
       effect_x_space = effect_y_space = 2;
       effect_x_offset = effect_y_offset = 1;
     }
-  else if (opt_shade)
+  else if (opt_shade && !opt_minspace)
     {
       /* adding a shadow increases the space used */
       effect_x_space = abs (SHADE_X);
@@ -391,6 +371,13 @@ InitWindow (void)
       effect_x_space = effect_y_space = 0;
       effect_x_offset = effect_y_offset = 0;
     }
+
+  {
+    struct logfile_entry *e;
+
+    for (e = loglist; e; e = e->next)
+      e->color = GetColor (e->colorname);
+  }
 
   XSelectInput (disp, root, ExposureMask | FocusChangeMask);
 }
@@ -1302,11 +1289,6 @@ main (int argc, char *argv[])
 
   setlocale (LC_CTYPE, "");     /* try to initialize the locale. */
 
-  /* window needs to be initialized before colorlookups can be done */
-  /* just a dummy to get the color lookups right */
-  geom_mask = NoValue;
-  InitWindow ();
-
   for (i = 1; i < argc; i++)
     {
       const char *arg = argv[i];
@@ -1351,6 +1333,8 @@ main (int argc, char *argv[])
             opt_shade = 1;
           else if (!strcmp (arg, "-outline"))
             opt_outline = 1;
+          else if (!strcmp (arg, "-minspace"))
+            opt_minspace = 1;
           else if (!strcmp (arg, "-noflicker"))
             opt_noflicker = 1;
           else if (!strcmp (arg, "-frame"))
@@ -1444,7 +1428,7 @@ main (int argc, char *argv[])
               e->desc = xstrdup (desc);
             }
 
-          e->color = GetColor (fcolor);
+          e->colorname = fcolor;
           e->partial = 0;
           e->fontname = fontname;
           e->last = NULL;
@@ -1606,6 +1590,8 @@ display_help (char *myname)
           "                           defaults to \"|| \"\n"
           " -wordwrap                 wrap long lines at spaces to avoid breaking words\n"
           " -shade                    add shading to font\n"
+          " -outline                  add black outline to font\n"
+          " -minspace                 force minimum line spacing\n"
           " -noinitial                don't display the last file lines on\n"
           "                           startup\n"
           " -i | -interval seconds    interval between checks (fractional\n"

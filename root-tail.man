@@ -4,32 +4,33 @@
 root-tail \- print text directly to X11 root window
 .SH SYNOPSIS
 .B root-tail
-.RB [ \-g \|| --geometry
+.RB [ \-g \|| \-\-geometry
 .IR GEOMETRY ]
-.RB [ \-fn \|| --font
+.RB [ \-fn \|| \-\-font
 .IR FONTSPEC ]
-.RB [ \--color
+.RB [ \-\-color
 .IR color ]
-.RB [ \--reload
+.RB [ \-\-reload
 .IR SEC
 .IR COMMAND ]
-.RB [ \--shade ]
-.RB [ \--outline ]
-.RB [ \--noflicker ]
-.RB [ \-f \|| \--fork ]
-.RB [ \--reverse ]
-.RB [ \--whole ]
-.RB [ \--partial ]
-.RB [ \--update ]
-.RB [ \--cont
+.RB [ \-\-shade ]
+.RB [ \-\-outline ]
+.RB [ \-\-minspace ]
+.RB [ \-\-noflicker ]
+.RB [ \-f \|| \-\-fork ]
+.RB [ \-\-reverse ]
+.RB [ \-\-whole ]
+.RB [ \-\-partial ]
+.RB [ \-\-update ]
+.RB [ \-\-cont
 .IR STRING ]
-.RB [ \--wordwrap ]
-.RB [ \--justify ]
-.RB [ \--noinitial ]
-.RB [ \--frame ]
+.RB [ \-\-wordwrap ]
+.RB [ \-\-justify ]
+.RB [ \-\-noinitial ]
+.RB [ \-\-frame ]
 .RB [ \-id
 .IR ID ]
-.RB [ \-i \|| \--interval
+.RB [ \-i \|| \-\-interval
 .IR SECONDS ]
 .RB [ \-V ]
 file1[,color[,desc]]
@@ -45,84 +46,88 @@ a description and the []'s.
 .PP
 .SS General Options
 .TP
-.BI \--color " COLOR"
+.BI \-\-color " COLOR"
 Use COLOR as default.
 .TP
-.BI "\--font \|| -fn" " FONTSPEC"
-Use font FONTSPEC. This can be either a fixed width font like \fB-fn\fI
-fixed\fR or any font using \fB-fn \fR'\fI-*-*-*-*-*-*-*-*-*-*-*-*-*-*\fR' with
+.BI "\-\-font \|| -fn" " FONTSPEC"
+Use font FONTSPEC. This can be either a fixed width font like \fB\-fn\fI
+fixed\fR or any font using \fB\-fn \fR'\fI-*-*-*-*-*-*-*-*-*-*-*-*-*-*\fR' with
 the appropriate fields filled out (see xfontsel).  Specifying a
 different FONTSPEC before each filename will cause each file to be
 displayed in a different font.
 .TP
-.B -f \|| \--fork
+.B -f \|| \-\-fork
 Forks to the background.
 .TP
-.B \--reverse
+.B \-\-reverse
 Display the files in reverse order, with the newest lines at the top.
 .TP
-.B \--whole
+.B \-\-whole
 Only display whole lines. If the last line of a file doesn't yet end
 with a newline character then wait until it does before displaying
 it. This is the default if more than one file is being displayed.
 .TP
-.B \--partial
-This is the opposite of the \fB--whole\fR option (see above). It displays
+.B \-\-partial
+This is the opposite of the \fB\-\-whole\fR option (see above). It displays
 lines even if they don't yet have a newline at the end. This is the
 default if only one file is being displayed.
 .TP
-.B \--update
+.B \-\-update
 Update partial lines 'in place' if they are still on the screen when
-they are updated in their files. Using \fB--update\fR automatically turns on
-\fB--partial\fR.
+they are updated in their files. Using \fB\-\-update\fR automatically turns on
+\fB\-\-partial\fR.
 .TP
-.BI \--cont " STRING"
+.BI \-\-cont " STRING"
 When partial lines are broken into two lines in the display, prefix
-the 2nd line with STRING. Defaults to "\fI|| \fR". Specify the "\fB--whole\fR"
-argument to ensure partial lines are never displayed, or specify "\fB--update\fR"
+the 2nd line with STRING. Defaults to "\fI|| \fR". Specify the "\fB\-\-whole\fR"
+argument to ensure partial lines are never displayed, or specify "\fB\-\-update\fR"
 to attempt to "repair" broken lines in-place.
 .TP
-.BI \--cont-color " COLOR"
+.BI \-\-cont-color " COLOR"
 Use COLOR when displaying the continuation string (as optionally
-specified with the \fB--cont\fR option above).
+specified with the \fB\-\-cont\fR option above).
 .TP
-.B \--wordwrap
+.B \-\-wordwrap
 The default behaviour is to fit as much as possible onto each line of
 output, even if this means splitting a word between one line and the
-next. The \fB--wordwrap\fR argument splits lines at spaces if
+next. The \fB\-\-wordwrap\fR argument splits lines at spaces if
 possible.
 .TP
-.B \--justify
+.B \-\-justify
 After wrapping long lines, attempt to justify the text to produce a
-smooth right-hand margin.  Implies \fB--wordwrap\fR.
+smooth right-hand margin.  Implies \fB\-\-wordwrap\fR.
 .TP
-.BI \--reload " SEC COMMAND"
+.BI \-\-reload " SEC COMMAND"
 Re-display the file(s) and run COMMAND every SEC seconds. The
 default is to never re-display the file(s).
 .TP
-.B \--shade
+.B \-\-shade
 Add black shading to the font.
 .TP
-.B \--outline
+.B \-\-outline
 Add a black outline to the font (making redraws quite a bit slower).
 .TP
-.B \--noflicker
+.B \-\-minspace
+Use minimum linespace even when using shading or outlining. This might result in
+leftover pixels (dependign on font and logfile content).
+.TP
+.B \-\-noflicker
 Use slower but flicker-free update.
 .TP
-.B \--noinitial
+.B \-\-noinitial
 Don't display the end of the file(s) initially.
 .TP
 .BI "\-id" " ID"
 Use the given window ID for output instead of the root window.
 .TP
-.BI "\-i \|| \--interval" " SECONDS"
+.BI "\-i \|| \-\-interval" " SECONDS"
 Use the specified sleeping interval between checks instead of the
 default 2.4 seconds. Fractional values are OK.
 .TP
 .B \-V
 Print version information.
 .TP
-.B \--frame
+.B \-\-frame
 Draw a frame around the selected area.  This is useful when trying to
 find the perfect geometry.
 .IP

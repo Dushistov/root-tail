@@ -1,7 +1,13 @@
 1.2
+	- replaced default font by "*" to "ensure" some font is found.
 	- accept hexadecimal window ids, as does everybody else(?).
         - made it compile with ansi-89-based compilers again.
-	- use code from XPenguins to find the root window under GNOME, KDE, etc.
+	- add hack to support nautilus (not very stable, nautilus should
+          either use extended window manager hints or __SWM_VROOT, as everybody
+          else does).
+        - do not initialize the window twice (fixes problems with multiple
+          visuals).
+        - new option: -minspace.
 
 1.1  Thu Apr  8 21:59:35 CEST 2004
         - make it work with virtual root windows (again).

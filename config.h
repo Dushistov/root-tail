@@ -5,7 +5,7 @@
 
 
 //default font.. -font at runtime should work
-#define USE_FONT        "fixed"
+#define USE_FONT        "*"
 
 //default positions.. can be changed with -g at runtime
 #define STD_WIDTH       730
