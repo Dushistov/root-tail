@@ -15,6 +15,12 @@ root-tail \- print text directly to X11 root window
 .IR COMMAND ]
 .RB [ \-shade ]
 .RB [ \-f \|| \-fork ]
+.RB [ \-reverse ]
+.RB [ \-whole ]
+.RB [ \-partial ]
+.RB [ \-update ]
+.RB [ \-cont
+.IR STRING ]
 .RB [ \-noinitial ]
 .RB [ \-frame ]
 .RB [ \-id ID ]
@@ -37,33 +43,61 @@ will prevent the printing of a description and the []'s.
 Use color $color as default.
 .TP
 .BI "\-font \|| -fn" " FONTSPEC"
-Use font FONTSPEC this can be either fixed withn fonts like -fn fixed or any font using -fn '-*-*-*-*-*-*-*-*-*-*-*-*-*-*' with the appropriate fields filled out (see xfontsel)
+Use font FONTSPEC.  This can be either fixed withn fonts like -fn
+fixed or any font using -fn '-*-*-*-*-*-*-*-*-*-*-*-*-*-*' with the
+appropriate fields filled out (see xfontsel)
 .TP
 .B -f \|| \-fork
-Forks to the background and gives the pid of itself (useful if rt is being called from a script or frontend)
-.IP
+Forks to the background and gives the pid of itself (useful if rt is
+being called from a script or frontend)
+.TP
+.B \-reverse
+Display the files in reverse order, with the newest lines at the top.
+.TP
+.B \-whole
+Only display whole lines.  If the last line of a file doesn't yet end
+with a newline character then wait until it does before displaying
+it.  This is the default if more than one file is being displayed.
+.TP
+.B \-partial
+This is the opposite of the -whole option (see above).  It displays
+lines even if they don't yet have a newline at the end.  This is the
+default if only one file is being displayed.
+.TP
+.B \-update
+Update partial lines 'in place' if they are still on the screen when
+they are updated in their files.  Using -update automatically turns on
+-partial.
+.TP
+.BI \-cont " STRING"
+When partial lines are broken into two lines in the display, prefix
+the 2nd line with STRING.  Defaults to "[+]".  Specify the "-whole"
+argument to ensure partial lines are never displated, or
+specify "-update" to attempt to "repair" broken lines in-place.
 .TP
 .BI \-reload " SEC COMMAND"
-Run command & run command after $sec seconds.
+Re-display the file(s) and run COMMAND every SEC seconds.  The
+default is to never re-display the file(s).
 .TP
-.B \-shade      
-Add shading to font. 
+.B \-shade
+Add shading to the font.
 .TP
 .B \-noinitial
 Don't display the end of the file(s) initially.
 .TP
 .BI "\-id" " ID"
-Use the given window id for output instead of the root window.
+Use the given window ID for output instead of the root window.
 .TP
 .BI "\-i \|| \-interval" " SECONDS"
-Use the specified sleeping interval between checks instead of the default 3 seconds. Fractional values are o.k.
+Use the specified sleeping interval between checks instead of the
+default 3 seconds. Fractional values are OK.
 .TP
 .B \-V
 Print version information.
 .TP
 .B \-frame
-Surround the selected area with a frame. This is just a debugging tool and doesn't always work properly. Use it to find
-the perfect geometry.
+Surround the selected area with a frame. This is just a debugging tool
+and doesn't always work properly. Use it to find the perfect geometry.
 .IP
 .SH EXAMPLE
 .PP
@@ -75,7 +109,7 @@ root-tail -g 80x25+100+50 /var/log/messages,green /var/log/secure,red,'ALERT'
 Should you happen to find any bugs please fix them and send me a diff.
 .PP
 NOTE: This program was modified by Marc Lehmann <pcg@goof.com>, who
-couldn't reach the original author. Please direct bug-reports etc.. to pcg@goof.com.
+couldn't reach the original author. Please direct bug-reports etc. to
+pcg@goof.com.
 .PP
 http://root-tail.plan9.de/
-

@@ -40,12 +40,16 @@
 
 /* data structures */
 struct logfile_entry {
-    char *fname;		/* name of file                         */
-    char *desc;			/* alternative description              */
-    FILE *fp;			/* FILE struct associated with file     */
-    ino_t inode;		/* inode of the file opened		*/
-    off_t last_size;		/* file size at the last check		*/
-    unsigned long color;	/* color to be used for printing        */
+    char *fname;	 /* name of file                                */
+    char *desc;		 /* alternative description                     */
+    char *buf;		 /* text read but not yet displayed             */
+    FILE *fp;		 /* FILE struct associated with file            */
+    ino_t inode;	 /* inode of the file opened                    */
+    off_t last_size;	 /* file size at the last check                 */
+    unsigned long color; /* color to be used for printing               */
+    int partial;	 /* true if the last line isn't complete        */
+    int lastpartial;	 /* true if the previous output wasn't complete */
+    int index;		 /* index into linematrix of a partial line     */
     struct logfile_entry *next;
 };
 
@@ -60,14 +64,15 @@ int width = STD_WIDTH, listlen = STD_HEIGHT;
 int win_x = LOC_X, win_y = LOC_Y;
 int w = -1, h = -1, font_width, font_height, font_descent;
 int do_reopen;
-struct timeval interval = { 2, 400000 };	/* see Knuth */
+struct timeval interval = { 3, 0 };	/* see Knuth */
 XFontSet fontset;
 
 /* command line options */
 int opt_noinitial, opt_shade, opt_frame, opt_reverse, opt_nofilename,
-    geom_mask, reload = 3600;
+    opt_whole, opt_update, geom_mask, reload = 0;
 const char *command = NULL,
-    *fontname = USE_FONT, *dispname = NULL, *def_color = DEF_COLOR;
+    *fontname = USE_FONT, *dispname = NULL, *def_color = DEF_COLOR,
+    *continuation = "[+]";
 
 struct logfile_entry *loglist = NULL, *loglist_tail = NULL;
 
@@ -97,7 +102,7 @@ void redraw(void);
 void refresh(struct linematrix *, int, int);
 
 void transform_line(char *s);
-int lineinput(char *, int, FILE *);
+int lineinput(struct logfile_entry *);
 void reopen(void);
 void check_open_files(void);
 FILE *openlog(struct logfile_entry *);
@@ -375,27 +380,40 @@ void transform_line(char *s)
  * the last character if it's not a newline. This means 'string' must be
  * width + 2 wide!
  */
-int lineinput(char *string, int slen, FILE *f)
+int lineinput(struct logfile_entry *logfile)
 {
-    int len;
+  char *string = logfile->buf;
+  int slen = width + 2;
+  FILE *f = logfile->fp;
+
+  int len = strlen(string);
+  int partial = logfile->partial;
 
     do {
-	if (fgets(string, slen, f) == NULL)	/* EOF or Error */
+	if (fgets(string + len, slen - len, f) == NULL)	/* EOF or Error */
 	    return 0;
 
 	len = strlen(string);
     } while (len == 0);
 
+    logfile->partial = 0;
+
+    /* if the string ends in a newline, delete the newline */
     if (string[len - 1] == '\n')
 	string[len - 1] = '\0';			/* erase newline */
+    /* otherwise if we've read one too many characters, un-read the last one and delete it */
     else if (len >= slen - 1) {
 	ungetc(string[len - 1], f);
 	string[len - 1] = '\0';
-    }
+    } else if (opt_whole)
+	return 0;
+    else
+	logfile->partial = 1;
 
 #if HAS_REGEX
     transform_line(string);
 #endif
+    logfile->lastpartial = partial;
     return len;
 }
 
@@ -425,12 +443,7 @@ FILE *openlog(struct logfile_entry *file)
       fseek (file->fp, 0, SEEK_END);
     else if (stats.st_size > (listlen + 1) * width)
       {
-        char dummy[255];
-
         fseek(file->fp, -((listlen + 2) * width), SEEK_END);
-        /* the pointer might point halfway some line. Let's
-           be nice and skip this damaged line */
-        lineinput(dummy, sizeof(dummy), file->fp);
       }
 
     file->last_size = stats.st_size;
@@ -488,49 +501,39 @@ void check_open_files(void)
 #define SCROLL_UP(lines, listlen)				\
 {								\
     int cur_line;						\
+    struct logfile_entry *current;				\
     for (cur_line = 0; cur_line < (listlen - 1); cur_line++) {	\
 	strcpy(lines[cur_line].line, lines[cur_line + 1].line);	\
 	lines[cur_line].color = lines[cur_line + 1].color;	\
     }								\
+    for (current = loglist; current; current = current->next)	\
+	if (current->partial && current->index)			\
+	    current->index--;					\
 }
 
 void main_loop(void)
 {
     struct linematrix *lines = xmalloc(sizeof(struct linematrix) * listlen);
-    int lin, miny, maxy, buflen;
-    char *buf;
+    int lin, miny, maxy;
     time_t lastreload;
     Region region = XCreateRegion();
     XEvent xev;
+    struct logfile_entry *lastprinted = NULL;
+    struct logfile_entry *current;
 
     maxy = 0;
     miny = win_y + h;
-    buflen = width + 2;
-    buf = xmalloc(buflen);
     lastreload = time(NULL);
 
     /* Initialize linematrix */
     for (lin = 0; lin < listlen; lin++) {
-	lines[lin].line = xmalloc(buflen);
+	lines[lin].line = xmalloc(width + 2);
 	strcpy(lines[lin].line, "~");
 	lines[lin].color = GetColor(def_color);
     }
 
-    if (!opt_noinitial)
-      {
-	while (lineinput(buf, buflen, loglist->fp) != 0) {
-	    SCROLL_UP(lines, listlen);
-	    /* print the next line */
-	    strcpy(lines[listlen - 1].line, buf);
-	}
-
-	redraw ();
-      }
-
     for (;;) {
 	int need_update = 0;
-	struct logfile_entry *current;
-	static struct logfile_entry *lastprinted = NULL;
 
 	/* read logs */
 	for (current = loglist; current; current = current->next) {
@@ -539,19 +542,81 @@ void main_loop(void)
 
 	    clearerr(current->fp);
 
-	    while (lineinput(buf, buflen, current->fp) != 0) {
+	    while (lineinput(current) != 0) {
+
+		/* if we're trying to update old partial lines in
+		 * place, and the last time this file was updated the
+		 * output was partial, and that partial line is not
+		 * too close to the top of the screen, then update
+		 * that partial line */
+		if (opt_update && current->lastpartial && current->index >= 3) {
+		    int old_len = strlen(lines[current->index].line);
+		    int new_len = strlen(current->buf);
+		    int space_on_old_line = width - old_len;
+		    strncat(lines[current->index].line, current->buf, width - old_len);
+		    /* if we can't fit the whole update into the old
+		     * partial line then we're going to have to print
+		     * the rest of it at the bottom on the screen */
+		    if (new_len > space_on_old_line) {
+			/* strcpy() doesn't like the strings to
+			 * overlap in memory, but memmove() doesn't
+			 * care */
+			memmove(current->buf,
+				current->buf + space_on_old_line,
+				new_len - space_on_old_line + 1);
+		    } else {
+		      need_update = 1;
+		      strcpy(current->buf, "");
+		      continue;
+		    }
+		}
+
 		/* print filename if any, and if last line was from
-		   different file */
+		 * different file */
 		if (!opt_nofilename &&
-			!(lastprinted && lastprinted == current) &&
-			current->desc[0]) {
+		    lastprinted != current &&
+		    current->desc[0]) {
 		    SCROLL_UP(lines, listlen);
 		    sprintf(lines[listlen - 1].line, "[%s]", current->desc);
 		    lines[listlen - 1].color = current->color;
 		}
 
-		SCROLL_UP(lines, listlen);
-		strcpy(lines[listlen - 1].line, buf);
+		/* if this is the same file we showed last, and the
+		 * last time we showed it, it wasn't finished, then
+		 * append to the last line shown */
+		if (lastprinted == current && current->lastpartial) {
+		    int old_len = strlen(lines[listlen - 1].line);
+		    int new_len = strlen(current->buf);
+		    strncat(lines[listlen - 1].line, current->buf, width - old_len);
+		    /* if it doesn't all fit, then put the part that
+		     * doesn't fit on a new line */
+		    if (new_len > width - old_len) {
+			SCROLL_UP(lines, listlen);
+			strcpy(lines[listlen - 1].line, current->buf + width - old_len);
+		    }
+		/* show the 'continuation' string because we've got a
+		 * continued partial line, but we weren't able to
+		 * append it to the old displayed partial line */
+		} else if (current->lastpartial) {
+		    int old_len = strlen(continuation);
+		    int new_len = strlen(current->buf);
+		    SCROLL_UP(lines, listlen);
+		    strcpy(lines[listlen - 1].line, continuation);
+		    strncat(lines[listlen - 1].line, current->buf, width - old_len);
+		    /* it might not fit, now that we've displayed the
+		     * continuation string, so we may need to 'wrap' it */
+		    if (new_len > width - old_len) {
+			SCROLL_UP(lines, listlen);
+			strcpy(lines[listlen - 1].line, current->buf + width - old_len);
+		    }
+		} else {
+		  SCROLL_UP(lines, listlen);
+		  strcpy(lines[listlen - 1].line, current->buf);
+		}
+
+		/* we've shown the line now.  clear the buffer for the next line */
+		strcpy(current->buf, "");
+		current->index = listlen - 1;
 		lines[listlen - 1].color = current->color;
 
 		lastprinted = current;
@@ -607,7 +672,7 @@ void main_loop(void)
 
 	/* reload if requested */
 	if (reload && lastreload + reload < time(NULL)) {
-	    if (command)
+	    if (command && command[0])
 		system(command);
 
 	    reopen();
@@ -630,6 +695,7 @@ int main(int argc, char *argv[])
 {
     int i;
     int opt_daemonize = 0;
+    int opt_partial = 0, file_count = 0;
 #if HAS_REGEX
     char *transform = NULL;
 #endif
@@ -658,6 +724,8 @@ int main(int argc, char *argv[])
 			&win_x, &win_y, &width, &listlen);
 	    else if (!strcmp(arg, "-display"))
 		dispname = argv[++i];
+	    else if (!strcmp(arg, "-cont"))
+		continuation = argv[++i];
 	    else if (!strcmp(arg, "-font") || !strcmp(arg, "-fn"))
 		fontname = argv[++i];
 #if HAS_REGEX
@@ -678,6 +746,12 @@ int main(int argc, char *argv[])
 		opt_nofilename = 1;
 	    else if (!strcmp(arg, "-reverse"))
 		opt_reverse = 1;
+	    else if (!strcmp(arg, "-whole"))
+		opt_whole = 1;
+	    else if (!strcmp(arg, "-partial"))
+		opt_partial = 1;
+	    else if (!strcmp(arg, "-update"))
+		opt_update = opt_partial = 1;
 	    else if (!strcmp(arg, "-color"))
 		def_color = argv[++i];
 	    else if (!strcmp(arg, "-noinitial"))
@@ -698,6 +772,8 @@ int main(int argc, char *argv[])
 	    struct logfile_entry *e;
 	    const char *fname, *desc, *fcolor = def_color;
 	    char *p;
+
+	    file_count++;
 
 	    /* this is not foolproof yet (',' in filenames are not allowed) */
 	    fname = desc = arg;
@@ -736,6 +812,9 @@ int main(int argc, char *argv[])
 	    }
 
 	    e->color = GetColor(fcolor);
+	    e->buf = xmalloc(width + 2);
+	    e->partial = 0;
+	    e->buf[0] = '\0';
 	    e->next = NULL;
 
 	    if (!loglist)
@@ -750,6 +829,19 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "You did not specify any files to tail\n"
 		"use %s --help for help\n", argv[0]);
 	exit(1);
+    }
+
+    if (opt_partial && opt_whole) {
+      fprintf(stderr, "Specify at most one of -partial and -whole\n");
+      exit(1);
+    }
+
+    /* if we specifically requested to see partial lines then don't insist on whole lines */
+    if (opt_partial) {
+      opt_whole = 0;
+    /* otherwise, if we've viewing multiple files, default to showing whole lines */
+    } else if (file_count > 1) {
+      opt_whole = 1;
     }
 
 #if HAS_REGEX
@@ -824,16 +916,20 @@ void display_help(char *myname)
     printf(" -g | -geometry geometry   -g WIDTHxHEIGHT+X+Y\n"
 	    " -color    color           use color $color as default\n"
 	    " -reload sec command       reload after $sec and run command\n"
-	    "                           by default -- 3 mins\n"
 	    " -id id                    window id to use instead of the root window\n"
 	    " -font FONTSPEC            (-fn) font to use\n"
 	    " -f | -fork                fork into background\n"
 	    " -reverse                  print new lines at the top\n"
+	    " -whole                    wait for \\n before showing a line\n"
+	    " -partial                  show lines even if they don't end with a \\n\n"
+	    " -update                   allow updates to old partial lines\n"
+	    " -cont                     string to prefix continued partial lines with\n"
+	    "                           defaults to \"[+]\"\n"
 	    " -shade                    add shading to font\n"
 	    " -noinitial                don't display the last file lines on\n"
 	    "                           startup\n"
 	    " -i | -interval seconds    interval between checks (fractional\n"
-	    "                           values o.k.). Default 3\n"
+	    "                           values o.k.). Default 3 seconds\n"
 	    " -V                        display version information and exit\n"
 	    "\n");
     printf("Example:\n%s -g 80x25+100+50 -font fixed /var/log/messages,green "
