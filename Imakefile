@@ -7,8 +7,3 @@ OBJS = $(SRCS:.c=.o)
 
 ComplexProgramTarget(root-tail)
 
-dist: clean
-	rm Makefile
-	cd .. && for i in root-tail-*; do		\
-           tar cvzpf ~/www/src/marc/data/$$i.tar.gz $$i	--exclude tst;		\
-        done						\

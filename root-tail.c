@@ -54,7 +54,7 @@ struct linematrix {
 
 
 /* global variables */
-unsigned int width = STD_WIDTH, listlen = STD_HEIGHT;
+int width = STD_WIDTH, listlen = STD_HEIGHT;
 int win_x = LOC_X, win_y = LOC_Y;
 int w = -1, h = -1, font_width, font_height, font_descent;
 int do_reopen;
