@@ -36,7 +36,7 @@ file1[,color[,desc]]
 [file2[,color[,desc]]]
 .\" Die Beschreibung
 .SH DESCRIPTION
-Displays a given file anywhere on your X11 root window, e..g it is kind of tail -f for multiple files
+Displays a given file anywhere on your X11 root window, i.e. it is kind of tail -f for multiple files
 using your desktop background as output window.
 .PP
 All non-option arguments on the comamnd line are files to be logged. A
