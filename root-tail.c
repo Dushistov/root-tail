@@ -68,14 +68,14 @@ struct linematrix
 struct linematrix *lines;
 int width = STD_WIDTH, height = STD_HEIGHT, listlen;
 int win_x = LOC_X, win_y = LOC_Y;
-int font_descent, font_height;
+int font_ascent, font_height;
 int do_reopen;
 struct timeval interval = { 2, 400000 };
 XFontSet fontset;
 
 /* command line options */
 int opt_noinitial, opt_shade, opt_frame, opt_reverse, opt_nofilename,
-  opt_outline, opt_whole, opt_update, geom_mask, reload = 0;
+  opt_outline, opt_noflicker, opt_whole, opt_update, geom_mask, reload = 0;
 const char *command = NULL,
   *fontname = USE_FONT, *dispname = NULL, *def_color = DEF_COLOR,
   *continuation = "[+]";
@@ -106,7 +106,7 @@ void blank_window (int);
 void InitWindow (void);
 unsigned long GetColor (const char *);
 void redraw (void);
-void refresh (int, int);
+void refresh (int, int, int);
 
 void transform_line (char *s);
 int lineinput (struct logfile_entry *);
@@ -287,7 +287,7 @@ InitWindow (void)
     XFontSetExtents *xfe = XExtentsOfFontSet (fontset);
 
     font_height = xfe->max_logical_extent.height;
-    font_descent = xfe->max_logical_extent.y;
+    font_ascent = -xfe->max_logical_extent.y;
   }
 
   if (geom_mask & XNegative)
@@ -318,13 +318,12 @@ void
 redraw (void)
 {
   XSetClipMask (disp, WinGC, None);
-  XClearArea (disp, root, win_x - 2, win_y - 2, width + 5, height + 5, False);
-  refresh (0, 32768);
+  refresh (0, 32768, 1);
 }
 
 /* Just redraw everything without clearing (i.e. after an EXPOSE event) */
 void
-refresh (int miny, int maxy)
+refresh (int miny, int maxy, int clear)
 {
   int lin;
   int offset = (listlen + 1) * font_height;
@@ -332,6 +331,9 @@ refresh (int miny, int maxy)
 
   miny -= win_y + font_height;
   maxy -= win_y - font_height;
+
+  if (clear && !opt_noflicker)
+    XClearArea (disp, root, win_x, win_y, width, height, False);
 
   for (lin = listlen; lin--;)
     {
@@ -341,6 +343,9 @@ refresh (int miny, int maxy)
 
       if (offset < miny || offset > maxy)
         continue;
+
+      if (clear && opt_noflicker)
+        XClearArea (disp, root, win_x, win_y + offset - font_ascent, width, font_height, False);
 
       if (opt_outline)
         {
@@ -809,7 +814,7 @@ main_loop (void)
           XSetRegion (disp, WinGC, region);
           XClipBox (region, &r);
 
-          refresh (r.y, r.y + r.height);
+          refresh (r.y, r.y + r.height, 0);
 
           XDestroyRegion (region);
           region = XCreateRegion ();
@@ -873,6 +878,8 @@ main (int argc, char *argv[])
             opt_shade = 1;
           else if (!strcmp (arg, "-outline"))
             opt_outline = 1;
+          else if (!strcmp (arg, "-noflicker"))
+            opt_noflicker = 1;
           else if (!strcmp (arg, "-frame"))
             opt_frame = 1;
           else if (!strcmp (arg, "-no-filename"))

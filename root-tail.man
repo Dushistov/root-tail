@@ -1,4 +1,4 @@
-.TH ROOTTAIL 1 "Nov 13, 2000" "Version 0.0.10"
+.TH ROOTTAIL 1 "2004-03-27" "Version 1.0"
 .UC 5
 .SH NAME
 root-tail \- print text directly to X11 root window
@@ -15,6 +15,7 @@ root-tail \- print text directly to X11 root window
 .IR COMMAND ]
 .RB [ \-shade ]
 .RB [ \-outline ]
+.RB [ \-noflicker ]
 .RB [ \-f \|| \-fork ]
 .RB [ \-reverse ]
 .RB [ \-whole ]
@@ -85,6 +86,9 @@ Add black shading to the font.
 .TP
 .B \-outline
 Add black outline to the font.
+.TP
+.B \-noflicker
+Use slower but flicker-free update.
 .TP
 .B \-noinitial
 Don't display the end of the file(s) initially.

@@ -13,6 +13,7 @@
 	    * -update: to attempt to complete old partial lines 'in-place'
 	    * -cont: to specify a string to prefix 'broken' partial lines with
             * -outline: black outline (relatively slow).
+            * -noflicker: slower but flickerfree update.
 	- comment default interval of 2.4 seconds.
 	- set default 'reload' value to 0 to prevent reloads.
 	- updated man page
