@@ -8,6 +8,7 @@
         - do not initialize the window twice (fixes problems with multiple
           visuals).
         - new option: -minspace.
+	- fixed seg fault if geometry is too short to fit a single line
 
 1.1  Thu Apr  8 21:59:35 CEST 2004
         - make it work with virtual root windows (again).
