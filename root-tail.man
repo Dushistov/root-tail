@@ -82,7 +82,7 @@ display, prefix the 2nd line with STRING. Defaults to "\fI[+]\fR". Specify the
 .B \--wordwrap
 The default behaviour is to fit as much as possible onto each line of
 output, even if this means splitting a word between one line and the
-next.  The \fB--wordwrap\fR argument splits lines at spaces if
+next. The \fB--wordwrap\fR argument splits lines at spaces if
 possible.
 .TP
 .BI \--reload " SEC COMMAND"
