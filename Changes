@@ -1,11 +1,11 @@
-1.2  Fri Mar 26 13:19:10 CET 2004
-
+1.0
+        - -geometry now expects _pixels_ not _characters_.
+        - locale settings for multibyte characters are respected.
+        - proportional fonts are supported now.
+	- supports options as long options now.
 	- call redraw() before entering the main loop to ensure that
           at least something is displayed on the root window
           immediately
-
-1.1  Fri Mar 26 03:58:50 CET 2004
-
 	- added options:
 	    * -whole : to only display lines once they are \n terminated
 	    * -partial: to display lines whether they are terminated or not
@@ -15,10 +15,6 @@
 	  '-help' text and man page.
 	- set default 'reload' value to 0 to prevent reloads.
 	- updated man page
-
-1.0
-
-	- supports options as long options now.
 	- strict-aliasing fix suggested by mmj.
 
 0.9  Wed Feb 25 15:25:49 CET 2004
