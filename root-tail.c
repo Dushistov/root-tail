@@ -564,7 +564,7 @@ insert_line (int idx)
     lines[cur_line] = lines[cur_line + 1];
 
   for (current = loglist; current; current = current->next)
-    if (current->partial && current->index && current->index <= idx)
+    if (current->index <= idx)
       current->index--;
 }
 
@@ -584,7 +584,7 @@ delete_line (int idx)
   lines[0].line = strdup ("~");
 
   for (current = loglist; current; current = current->next)
-    if (current->partial && current->index && current->index <= idx)
+    if (current->index >= 0 && current->index <= idx)
       current->index++;
 }
 
@@ -699,9 +699,11 @@ main_loop (void)
                * output was partial, and that partial line is not
                * too close to the top of the screen, then update
                * that partial line */
-              if (opt_update && current->lastpartial && current->index > 0)
+              if (opt_update && current->lastpartial && current->index >= 0)
                 {
-                  append_line (current->index, current->buf);
+                  int idx = current->index;
+                  append_line (idx, current->buf);
+                  current->index = idx;
                   free (current->buf), current->buf = 0;
                   continue;
                 }
@@ -921,6 +923,7 @@ main (int argc, char *argv[])
           e = xmalloc (sizeof (struct logfile_entry));
           e->partial = 0;
           e->buf = 0;
+          e->index = -1;
 
           if (arg[0] == '-' && arg[1] == '\0')
             {
