@@ -1,5 +1,6 @@
 1.0
 	- fix a bug regarding long (>1023 bytes) lines.
+        - c89 compatibility fixes by Seth W. Klein.
 
 0.95  Thu Apr  1 00:39:08 CEST 2004
         - -geometry now expects _pixels_ not _characters_.

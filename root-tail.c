@@ -769,13 +769,15 @@ split_line (int idx, const char *str, unsigned long color)
 
       while (*p)
         {
+          int cw, len;
+
 	  /* find the length in bytes of the next multibyte character */
-          int len = mblen (p, l);
+          len = mblen (p, l);
           if (len <= 0)
             len = 1; /* ignore (don't skip) illegal character sequences */
 
 	  /* find the width in pixels of the next character */
-          int cw = XmbTextEscapement (fontset, p, len);
+          cw = XmbTextEscapement (fontset, p, len);
           if (cw + w > width - effect_x_space)
 	    {
 	      if (p == beg)
@@ -857,8 +859,6 @@ append_line (int idx, const char *str)
 static void
 main_loop (void)
 {
-  lines = xmalloc (sizeof (struct linematrix) * listlen);
-  display = xmalloc (sizeof (struct displaymatrix) * listlen);
   int lin;
   time_t lastreload;
   Region region = XCreateRegion ();
@@ -866,6 +866,9 @@ main_loop (void)
   struct logfile_entry *lastprinted = NULL;
   struct logfile_entry *current;
   int need_update = 1;
+
+  lines = xmalloc (sizeof (struct linematrix) * listlen);
+  display = xmalloc (sizeof (struct displaymatrix) * listlen);
 
   lastreload = time (NULL);
 
