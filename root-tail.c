@@ -75,7 +75,8 @@ XFontSet fontset;
 
 /* command line options */
 int opt_noinitial, opt_shade, opt_frame, opt_reverse, opt_nofilename,
-  opt_outline, opt_noflicker, opt_whole, opt_update, geom_mask, reload = 0;
+  opt_outline, opt_noflicker, opt_whole, opt_update, opt_wordwrap,
+  geom_mask, reload = 0;
 const char *command = NULL,
   *fontname = USE_FONT, *dispname = NULL, *def_color = DEF_COLOR,
   *continuation = "[+]";
@@ -609,7 +610,7 @@ delete_line (int idx)
 }
 
 /*
- * takes a logical log file line and split it into multiple physical
+ * takes a logical log file line and splits it into multiple physical
  * screen lines by splitting it whenever a part becomes too long.
  * lal lines will be inserted at position "idx".
  */
@@ -622,22 +623,40 @@ split_line (int idx, const char *str, unsigned long color)
   do
     {
       const char *beg = p;
-      int w = 0;
+      int w = 0, wrapped = 0;
+      const char *break_p = NULL;
 
       while (*p)
         {
+	  /* find the length in bytes of the next multibyte character */
           int len = mblen (p, l);
           if (len <= 0)
-            len = 1; /* ignore (don't skip) ilegal character sequences */
+            len = 1; /* ignore (don't skip) illegal character sequences */
 
+	  /* find the width in pixels of the next character */
           int cw = XmbTextEscapement (fontset, p, len);
           if (cw + w >= width)
-            break;
+	    {
+	      wrapped = 1;
+	      break;
+	    }
+
+	  if (opt_wordwrap && len == 1 && p[0] == ' ')
+	    break_p = p;
 
           w += cw;
           p += len;
           l -= len;
         }
+
+      /* if we're wrapping at spaces, and the line is long enough to
+       * wrap, and we've seen a space already, and the space wasn't
+       * the first character on the line, then wrap at the space */
+      if (opt_wordwrap && wrapped && break_p && break_p != beg)
+	{
+	  l += p - break_p;
+	  p = break_p;
+	}
 
       {
         char *s = xmalloc (p - beg + 1);
@@ -648,6 +667,13 @@ split_line (int idx, const char *str, unsigned long color)
         lines[idx].len = p - beg;
         lines[idx].color = color;
       }
+
+      /* if we wrapped at a space, don't display the space */
+      if (opt_wordwrap && wrapped && break_p && break_p != beg)
+	{
+	  l--;
+	  p++;
+	}
     }
   while (l);
 }
@@ -894,6 +920,8 @@ main (int argc, char *argv[])
             opt_partial = 1;
           else if (!strcmp (arg, "-update"))
             opt_update = opt_partial = 1;
+          else if (!strcmp (arg, "-wordwrap"))
+            opt_wordwrap = 1;
           else if (!strcmp (arg, "-color"))
             def_color = argv[++i];
           else if (!strcmp (arg, "-noinitial"))
@@ -1090,6 +1118,7 @@ display_help (char *myname)
           " -partial                  show lines even if they don't end with a \\n\n"
           " -update                   allow updates to old partial lines\n"
           " -cont                     string to prefix continued partial lines with\n"
+          " -wordwrap                 wrap long lines at spaces to avoid breaking words\n"
           "                           defaults to \"[+]\"\n"
           " -shade                    add shading to font\n"
           " -noinitial                don't display the last file lines on\n"

@@ -1,2 +1,5 @@
+.suppressions
+Backup
+man1
 root-tail
 root-tail.1.gz
