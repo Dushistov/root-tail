@@ -542,43 +542,52 @@ concat_line (const char *p1, const char *p2)
 int
 lineinput (struct logfile_entry *logfile)
 {
-  char buff[1024], *p = buff;
+  char buff[1024], *p;
   int ch;
   /* HACK-2: add on the length of any partial line which we will be appending to */
   int ofs = logfile->buf ? strlen (logfile->buf) : 0;
 
+  /* this loop ensures that the whole line is read, even if it's
+   * longer than the buffer.  we need to do this because when --whole
+   * is in effect we don't know whether to display the line or not
+   * until we've seen how (ie. whether) it ends */
   do
     {
-      ch = fgetc (logfile->fp);
+      p = buff;
+      do
+	{
+	  ch = fgetc (logfile->fp);
 
-      if (ch == '\n' || ch == EOF)
-        break;
-      else if (ch == '\r')
-        continue; /* skip */
-      else if (ch == '\t')
-        {
-          do
-            {
-              *p++ = ' ';
-              ofs++;
-            }
-          while (ofs & 7);
-        }
-      else
-        {
-          *p++ = ch;
-          ofs++;
-        }
+	  if (ch == '\n' || ch == EOF)
+	    break;
+	  else if (ch == '\r')
+	    continue; /* skip */
+	  else if (ch == '\t')
+	    {
+	      do
+		{
+		  *p++ = ' ';
+		  ofs++;
+		}
+	      while (ofs & 7);
+	    }
+	  else
+	    {
+	      *p++ = ch;
+	      ofs++;
+	    }
+	}
+      while (p < buff + (sizeof buff) - 8 - 1);
+
+      if (p == buff && ch == EOF)
+	return 0;
+
+      *p = 0;
+
+      p = concat_line (logfile->buf, buff);
+      free (logfile->buf); logfile->buf = p;
     }
-  while (p < buff + (sizeof buff) - 8 - 1);
-
-  if (p == buff && ch == EOF)
-    return 0;
-
-  *p = 0;
-
-  p = concat_line (logfile->buf, buff);
-  free (logfile->buf); logfile->buf = p;
+  while (ch != '\n' && ch != EOF);
 
   logfile->lastpartial = logfile->partial;
   /* there are 3 ways we could have exited the loop: reading '\n',
