@@ -24,12 +24,13 @@ AUTHORS
 
    Please tell me if I left anybody out.
    
-   Mike Baker <mjbaker@mtu.edu>		original author
-   Ivo van der Wijk <irvdwijk@cs.vu.nl>	co-author
-   Marc Lehmann <pcg@goof.com>		optimized refresh
-   Olexij Tkatchenko <ot@parcs.de>	correct refresh ;)
-   Daniel Lowe <ashe@sanctuary.org>	many small improvements
-   andre@aleph.it			signal handling
+   Mike Baker <mjbaker@mtu.edu>		   original author
+   Ivo van der Wijk <irvdwijk@cs.vu.nl>	   co-author
+   Marc Lehmann <pcg@goof.com>		   optimized refresh
+   Olexij Tkatchenko <ot@parcs.de>	   correct refresh ;)
+   Daniel Lowe <ashe@sanctuary.org>	   many small improvements
+   andre@aleph.it			   signal handling
+   Mike Schiraldi <roottail@schiraldi.org> detabification, -noinital bugfix
 
    Here is a list of all (since I started this list) people that helped by
    diagnosing a bug:

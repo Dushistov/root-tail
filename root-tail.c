@@ -61,7 +61,7 @@ int do_reopen;
 struct timeval interval = { 2, 400000 };	/* see Knuth */
 
 /* command line options */
-int opt_noinitial, opt_shade, opt_frame, opt_reverse=0, opt_nofilename,
+int opt_noinitial, opt_shade, opt_frame, opt_reverse, opt_nofilename,
     geom_mask, reload = 3600;
 const char *command = NULL,
     *fontname = USE_FONT, *dispname = NULL, *def_color = DEF_COLOR;

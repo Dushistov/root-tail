@@ -1,3 +1,6 @@
+	- applied patch by ami@fischman.org (tac).
+        - applied patch by raldi@verisignlabs.com (-noinitial fix).
+
 0.1.1
 	- backported fixed from Marco d'Itri, who did most of the maintaining
           work over the last year(s). Unfortunately, he doesn't answer my mails
