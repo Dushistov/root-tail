@@ -339,38 +339,25 @@ InitWindow (void)
         e->font_height = xfe->max_logical_extent.height;
         e->font_ascent = -xfe->max_logical_extent.y;
       }
+
+      if (e->font_height > height - effect_y_space)
+	{
+	  fprintf(stderr, "\n  the display isn't tall enough to display a single line in font '%s'\n",
+		  e->fontname);
+	  fprintf(stderr, "\n  the geometry in use is %d pixels tall\n", height);
+	  fprintf(stderr, "\n  font '%s' is %d pixels tall\n", e->fontname, e->font_height);
+	  if (effect_y_space)
+	    fprintf(stderr, "\n  the shade or outline options need an extra %d pixel%s of vertical space\n",
+		    effect_y_space, effect_y_space == 1 ? "" : "s");
+	  fprintf(stderr, "\n");
+	  exit(1);
+	}
     }
 
   if (geom_mask & XNegative)
     win_x = win_x + ScreenWidth - width;
   if (geom_mask & YNegative)
     win_y = win_y + ScreenHeight - height;
-
-  if (opt_outline && !opt_minspace)
-    {
-      /* adding outline increases the total width and height by 2
-         pixels each, and offsets the text one pixel right and one
-         pixel down */
-      effect_x_space = effect_y_space = 2;
-      effect_x_offset = effect_y_offset = 1;
-    }
-  else if (opt_shade && !opt_minspace)
-    {
-      /* adding a shadow increases the space used */
-      effect_x_space = abs (SHADE_X);
-      effect_y_space = abs (SHADE_Y);
-
-      /* if the shadow is to the right and below then we don't need
-       * to move the text to make space for it, but shadows to the left
-       * and above need accomodating */
-      effect_x_offset = SHADE_X > 0 ? 0 : -SHADE_X;
-      effect_y_offset = SHADE_Y > 0 ? 0 : -SHADE_Y;
-    }
-  else
-    {
-      effect_x_space = effect_y_space = 0;
-      effect_x_offset = effect_y_offset = 0;
-    }
 
   {
     struct logfile_entry *e;
@@ -574,6 +561,12 @@ refresh (int miny, int maxy, int clear, int refresh_all)
                   width + MARGIN_OF_ERROR, space, False);
 #endif
     }
+
+  /* at least one of the lines must fit in the allocated area.  we've
+   * already checked at initialisation time that all the fonts are small
+   * enough to fit at least one line in the display area, but assert it
+   * again here to be sure */
+  assert(line != linelist);
 
   /* any lines that didn't just get looked at are never going to be, so break the chain */
   if (line) line->prev->next = 0;
@@ -1498,6 +1491,32 @@ main (int argc, char *argv[])
         printf ("compiled '%s' OK to %x\n", transform, (int)transformre);
     }
 #endif
+
+  if (opt_outline && !opt_minspace)
+    {
+      /* adding outline increases the total width and height by 2
+         pixels each, and offsets the text one pixel right and one
+         pixel down */
+      effect_x_space = effect_y_space = 2;
+      effect_x_offset = effect_y_offset = 1;
+    }
+  else if (opt_shade && !opt_minspace)
+    {
+      /* adding a shadow increases the space used */
+      effect_x_space = abs (SHADE_X);
+      effect_y_space = abs (SHADE_Y);
+
+      /* if the shadow is to the right and below then we don't need
+       * to move the text to make space for it, but shadows to the left
+       * and above need accomodating */
+      effect_x_offset = SHADE_X > 0 ? 0 : -SHADE_X;
+      effect_y_offset = SHADE_Y > 0 ? 0 : -SHADE_Y;
+    }
+  else
+    {
+      effect_x_space = effect_y_space = 0;
+      effect_x_offset = effect_y_offset = 0;
+    }
 
   InitWindow ();
 
