@@ -130,6 +130,10 @@ find the perfect geometry.
 root-tail -g 800x250+100+50 -font 10x20 /var/log/messages,green -font 12x24 /var/log/secure,red,'ALERT'
 .SH BUGS
 .PP
+Some desktop environments open a virtual root window and make it difficult to share it. If
+you cannot see anything after starting root-tail, try to find a setting "allow programs
+on desktop" or similar, or manually specify a window id.
+.PP
 Should you happen to find any bugs please fix them and send me a diff.
 .PP
 NOTE: This program was modified by Marc Lehmann <pcg@goof.com>, who

@@ -2,6 +2,7 @@
  * Copyright 2001 by Marco d'Itri <md@linux.it>
  * Copyright 2000,2001,2002,2003,2004
  *           Marc Lehmann <pcg@goof.com>,
+ *           Chris Moore <chris.moore@mail.com>,
  *           and many others, see README
  *
  * Original version by Mike Baker.
@@ -236,8 +237,7 @@ root_window (Display * display, int screen_number)
       Window unused, *windows;
       unsigned int count;
 
-      if (XQueryTree (display, real_root_window, &unused, &unused, &windows,
-                      &count))
+      if (XQueryTree (display, real_root_window, &unused, &unused, &windows, &count))
         {
           int i;
 
@@ -257,12 +257,13 @@ root_window (Display * display, int screen_number)
                     {
                       if (type == XA_WINDOW)
                         {
+                          root = *(Window *)virtual_root_window;
                           XFree (windows);
-                          return (Window) virtual_root_window;
+                          XFree (virtual_root_window);
+                          return root;
                         }
                       else
-                        fprintf (stderr,
-                                 "__SWM_VROOT property type mismatch");
+                        fprintf (stderr, "__SWM_VROOT property type mismatch");
                     }
                 }
               else

@@ -1,4 +1,5 @@
-1.1
+1.1  Thu Apr  8 21:59:35 CEST 2004
+        - make it work with virtual root windows (again).
 	- added options:
 	    * -justify: gives a smooth right-hand margin
 	    * -cont-color: allows the continuation marker to be a
@@ -11,7 +12,6 @@
 	- it is now possible to specify a different font for each
 	  logfile; use the -fn option between filenames.
         - fix very minor memleak.
-        - make it work with virtual root windows (again).
 
 1.0   Fri Apr  2 03:37:56 CEST 2004
 	- fix a bug regarding long (>1023 bytes) lines.

@@ -13,5 +13,5 @@
 #define LOC_X           30
 #define LOC_Y           30
 
-#define VERSION "1.0"
+#define VERSION "1.1"
 
