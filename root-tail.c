@@ -416,9 +416,14 @@ lineinput (struct logfile_entry *logfile)
     {
       ch = fgetc (logfile->fp);
 
-      if (ch == '\r')
+      if (ch == EOF)
+        {
+          fseek (logfile->fp, 0L, SEEK_CUR);
+          break;
+        }
+      else if (ch == '\r')
         continue;
-      else if (ch == EOF || ch == '\n')
+      else if (ch == '\n')
         break;
       else if (ch == '\t')
         {
