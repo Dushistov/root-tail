@@ -416,15 +416,10 @@ lineinput (struct logfile_entry *logfile)
     {
       ch = fgetc (logfile->fp);
 
-      if (ch == EOF)
-        {
-          fseek (logfile->fp, 0L, SEEK_CUR);
-          break;
-        }
-      else if (ch == '\r')
-        continue;
-      else if (ch == '\n')
+      if (ch == '\n' || ch == EOF)
         break;
+      else if (ch == '\r')
+        continue; /* skip */
       else if (ch == '\t')
         {
           do
@@ -665,6 +660,7 @@ main_loop (void)
   XEvent xev;
   struct logfile_entry *lastprinted = NULL;
   struct logfile_entry *current;
+  int need_update = 1;
 
   maxy = 0;
   miny = win_y + height;
@@ -678,16 +674,8 @@ main_loop (void)
       lines[lin].color = GetColor (def_color);
     }
 
-  /* show the display full of empty lines ("~") in case the first
-   * time around the loop doesn't produce any output, as it won't if
-   * either (a) -noinitial is set or (b) all the files are currently
-   * empty */
-  redraw ();
-
   for (;;)
     {
-      int need_update = 0;
-
       /* read logs */
       for (current = loglist; current; current = current->next)
         {
@@ -698,6 +686,7 @@ main_loop (void)
 
           while (lineinput (current))
             {
+             fprintf (stderr, "got line <%s>\n", current->buf);//D
               need_update = 1;
               /* if we're trying to update old partial lines in
                * place, and the last time this file was updated the
@@ -743,7 +732,10 @@ main_loop (void)
         }
 
       if (need_update)
-        redraw ();
+        {
+          redraw ();
+          need_update = 0;
+        }
       else
         {
           XFlush (disp);
