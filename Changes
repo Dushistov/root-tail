@@ -1,0 +1,37 @@
+0.1.1
+	- backported fixed from Marco d'Itri, who did most of the maintaining
+          work over the last year(s). Unfortunately, he doesn't answer my mails
+          (just as I did to most of root-tails users ;), so this is also the first
+          sourceforge release.
+
+0.0.10
+	- initial lines are now displayed in the correct colour
+	- documentation fixes
+
+0.0.9 Mon Nov 13 13:53:05 CET 2000
+	- fix descent redraw problem
+        - fix window offset miscalculation
+        - new option -interval
+        - new option -V
+        - more options shortcut
+        - ported to linux 2.4.0, thanks to stefan@weihnachtsmann.at
+
+0.0.8 Sun Nov 12 14:16:04 CET 2000
+	- small bugfixes.
+	- memory corruption fix.
+	- added fixes by Olexij Tkatchenko.
+        - fixed garbage on top of screen (ashe@sanctuary.org)
+        - added -noinitial option to keep from drawing to
+          screen until new data has arrived (ashe@sanctuary.org)
+        - restores background on quit (ashe@sanctuary.org)
+        - shading now simulates light source coming from
+          top-left instead of bottom-right to fit with
+          every other GUI in the world (ashe@sanctuary.org)
+	- removed startup message.
+
+0.0.7 Tue Oct 10 16:45:17 CEST 2000
+	- fix "lines containing zero" == endless loop bug.
+        - *ugly* workaround for the "does not redraw all lines
+          correctly" bug. no time to investigate this horror.
+        - fix segv on HUP bug.
+

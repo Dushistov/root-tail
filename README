@@ -1,0 +1,42 @@
+INSTALL
+
+   xmkmf -a
+   make
+   make install
+   make install.man
+
+OPINION
+
+   In my opinion, this program is a pile of crap which gets crappier with
+   every patch, but it is also sooo useful ;*)
+
+MAINTAINER
+
+   This program has gone through many hands (and is maybe the
+   most-forked-program ever), the current self-appointed maintainer, who
+   never wanted to publish his version is:
+
+   Marc Lehmann <pcg@goof.com>, http://root-tail.plan9.de/
+
+   Please send him any patches for this version.
+
+AUTHORS
+
+   Please tell me if I left anybody out.
+   
+   Mike Baker <mjbaker@mtu.edu>		original author
+   Ivo van der Wijk <irvdwijk@cs.vu.nl>	co-author
+   Marc Lehmann <pcg@goof.com>		optimized refresh
+   Olexij Tkatchenko <ot@parcs.de>	correct refresh ;)
+   Daniel Lowe <ashe@sanctuary.org>	many small improvements
+   andre@aleph.it			signal handling
+
+   Here is a list of all (since I started this list) people that helped by
+   diagnosing a bug:
+
+   Gunnar Ritter <g-r@bigfoot.de>
+   Kevin Bryan <kbry1257@postoffice.uri.edu>
+   Eric Thompson <thompe2@rpi.edu>
+
+
+
