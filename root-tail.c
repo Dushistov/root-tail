@@ -1175,7 +1175,12 @@ main (int argc, char *argv[])
       exit (1);
     }
 
-  if (opt_partial && opt_whole)
+  if (opt_update && opt_whole)
+    {
+      fprintf (stderr, "Specify at most one of -update and -whole\n");
+      exit (1);
+    }
+  else if (opt_partial && opt_whole)
     {
       fprintf (stderr, "Specify at most one of -partial and -whole\n");
       exit (1);
