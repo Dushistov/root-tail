@@ -403,24 +403,31 @@ refresh (int miny, int maxy, int clear, int refresh_all)
 
       /* if this line is a different than it was, then it
        * needs displaying */
-      if (refresh_all
+      if (!opt_noflicker
+	  || refresh_all
           || display_line->len != line->len
           || memcmp (display_line->line, line->line, line->len))
         {
-          /* update the record of what has been displayed;
-           * first make sure the buffer is big enough */
-          if (display_line->buffer_size <= line->len)
-            {
-              display_line->buffer_size = line->len + 1;
-              display_line->line = xrealloc (display_line->line, display_line->buffer_size);
-            }
+	  /* don't bother updating the record of what has been
+	   * displayed if -noflicker isn't in effect, since we redraw
+	   * the whole display every time anyway */
+	  if (opt_noflicker)
+	    {
+	      /* update the record of what has been displayed;
+	       * first make sure the buffer is big enough */
+	      if (display_line->buffer_size <= line->len)
+		{
+		  display_line->buffer_size = line->len + 1;
+		  display_line->line = xrealloc (display_line->line, display_line->buffer_size);
+		}
 
-          display_line->len = line->len;
-          memcpy (display_line->line, line->line, line->len);
+	      display_line->len = line->len;
+	      memcpy (display_line->line, line->line, line->len);
 
-          if (clear)
-            XClearArea (disp, root, win_x, win_y + offset - font_ascent,
-                        width + effect_x_space, font_height + effect_y_space, False);
+	      if (clear)
+		XClearArea (disp, root, win_x, win_y + offset - font_ascent,
+			    width + effect_x_space, font_height + effect_y_space, False);
+	    }
 
           if (opt_outline)
             {
