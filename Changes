@@ -20,7 +20,6 @@
 	- set default 'reload' value to 0 to prevent reloads.
 	- updated man page.
 	- strict-aliasing fix suggested by mmj.
-	- --fork option really does report the PID now, as the man page claims
 	- improved regexp transform code, but not enough...
 	- --frame now draws the frame in exactly the right place, just
 	  inside the window (previously a geometry of 1024x768+0+0 would

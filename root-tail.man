@@ -52,9 +52,7 @@ fixed\fR or any font using \fB-fn \fR'\fI-*-*-*-*-*-*-*-*-*-*-*-*-*-*\fR' with
 the appropriate fields filled out (see xfontsel).
 .TP
 .B -f \|| \--fork
-Forks to the background and writes the PID of the daemon process to
-standard output (useful if root-tail is being called from a script or
-frontend).
+Forks to the background.
 .TP
 .B \--reverse
 Display the files in reverse order, with the newest lines at the top.
