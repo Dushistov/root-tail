@@ -1,5 +1,5 @@
 0.21
-	- unsigned/fseek bug fix by Mads Martin Joergensen.
+	- unsigned/fseek bug fix by (mmj@panther.mmj.dk).
 
 0.2  Wed Sep  4 17:20:57 CEST 2002
 	- applied patch by ami@fischman.org (tac).
