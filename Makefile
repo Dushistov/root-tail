@@ -1,6 +1,6 @@
 COPTS = -g
 
-CFLAGS = -Wall $(COPTS)
+CFLAGS = -Wall $(COPTS) -DUSE_TOON_GET_ROOT_WINDOW
 
 LDFLAGS = -L/usr/X11R6/lib -lX11
 
@@ -9,10 +9,11 @@ BINDIR = $(PREFIX)/bin
 MANDIR = $(PREFIX)/share/man/man1
 DOCDIR = $(PREFIX)/share/doc/root-tail
 
+SOURCES = root-tail.c toon_root.c
 all: root-tail man
 
-root-tail: root-tail.c config.h
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+root-tail: $(SOURCES) config.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SOURCES)
 
 man: root-tail.1.gz
 

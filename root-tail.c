@@ -133,6 +133,9 @@ struct logfile_entry *loglist = NULL, *loglist_tail = NULL;
 
 Display *disp;
 Window root;
+#ifdef USE_TOON_GET_ROOT_WINDOW
+Window real_root;
+#endif /* USE_TOON_GET_ROOT_WINDOW */
 GC WinGC;
 
 #if HAS_REGEX
@@ -153,6 +156,9 @@ void list_files (int);
 void force_reopen (int);
 void force_refresh (int);
 void blank_window (int);
+#ifdef USE_TOON_GET_ROOT_WINDOW
+Window ToonGetRootWindow(Display *, int, Window *);
+#endif /* USE_TOON_GET_ROOT_WINDOW */
 
 void InitWindow (void);
 unsigned long GetColor (const char *);
@@ -212,7 +218,11 @@ GetColor (const char *ColorName)
   XColor Color;
   XWindowAttributes Attributes;
 
+#ifdef USE_TOON_GET_ROOT_WINDOW
+  XGetWindowAttributes (disp, real_root, &Attributes);
+#else /* USE_TOON_GET_ROOT_WINDOW */
   XGetWindowAttributes (disp, root, &Attributes);
+#endif /* USE_TOON_GET_ROOT_WINDOW */
   Color.pixel = 0;
 
   if (!XParseColor (disp, Attributes.colormap, ColorName, &Color))
@@ -223,6 +233,7 @@ GetColor (const char *ColorName)
   return Color.pixel;
 }
 
+#ifndef USE_TOON_GET_ROOT_WINDOW
 static Window
 root_window (Display * display, int screen_number)
 {
@@ -285,6 +296,7 @@ root_window (Display * display, int screen_number)
 
   return real_root_window;
 }
+#endif /* USE_TOON_GET_ROOT_WINDOW */
 
 void
 InitWindow (void)
@@ -304,7 +316,12 @@ InitWindow (void)
   ScreenHeight = DisplayHeight (disp, screen);
   ScreenWidth = DisplayWidth (disp, screen);
 
+#ifdef USE_TOON_GET_ROOT_WINDOW
+  real_root = RootWindow(disp, screen);
+  root = ToonGetRootWindow( disp, screen, &real_root );
+#else /* USE_TOON_GET_ROOT_WINDOW */
   root = root_window (disp, screen);
+#endif /* USE_TOON_GET_ROOT_WINDOW */
 
   gcm = GCBackground;
   gcv.graphics_exposures = True;
