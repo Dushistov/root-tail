@@ -417,7 +417,7 @@ refresh (int miny, int maxy, int clear, int refresh_all)
 	       * first make sure the buffer is big enough */
 	      if (display_line->buffer_size <= line->len)
 		{
-		  display_line->buffer_size = line->len + 1;
+		  display_line->buffer_size = line->len;
 		  display_line->line = xrealloc (display_line->line, display_line->buffer_size);
 		}
 
@@ -434,8 +434,8 @@ refresh (int miny, int maxy, int clear, int refresh_all)
               int x, y;
               XSetForeground (disp, WinGC, black_color);
 
-              for (x = -1; x < 2; x += 2)
-                for (y = -1; y < 2; y += 2)
+              for (x = -1; x <= 1; x += 2)
+                for (y = -1; y <= 1; y += 2)
                   XmbDrawString (disp, root, fontset, WinGC,
                                  win_x + effect_x_offset + x,
                                  win_y + y + offset,
@@ -490,28 +490,30 @@ transform_line (char *s)
 	  int match_start = matched[0].rm_so;
 	  int match_end = matched[0].rm_eo;
 	  int old_len = match_end - match_start;
-	  int new_len = strlen(transform_to);
-	  int old_whole_len = strlen(s);
-	  printf("regexp was matched by '%s' - replace with '%s'\n", s, transform_to);
-	  printf("match is from %d to %d\n",
-		 match_start, match_end);
-	  if (new_len > old_len) {
+	  int new_len = strlen (transform_to);
+	  int old_whole_len = strlen (s);
+
+	  printf ("regexp was matched by '%s' - replace with '%s'\n", s, transform_to);
+	  printf ("match is from %d to %d\n", match_start, match_end);
+	  if (new_len > old_len)
 	    s = xrealloc(s, old_whole_len + new_len - old_len);
-	  }
-	  if (new_len != old_len) {
-	    memcpy(s + match_end + new_len - old_len,
-		   s + match_end,
-		   old_whole_len - match_end);
-	    s[old_whole_len + new_len - old_len] = '\0';
-	  }
-	  memcpy(s + match_start,
-		 transform_to,
-		 new_len);
-	  printf("transformed to '%s'\n", s);
+	  
+	  if (new_len != old_len)
+            {
+              memcpy(s + match_end + new_len - old_len,
+                     s + match_end,
+                     old_whole_len - match_end);
+              s[old_whole_len + new_len - old_len] = '\0';
+            }
+
+	  memcpy (s + match_start,
+		  transform_to,
+		  new_len);
+	  printf ("transformed to '%s'\n", s);
         }
       else
 	{
-	  printf("regexp was not matched by '%s'\n", s);
+	  printf ("regexp was not matched by '%s'\n", s);
 	}
     }
 }
@@ -672,6 +674,8 @@ check_open_files (void)
             fclose (e->fp);
           if (openlog (e) == NULL)
             continue;
+          if (fstat (fileno (e->fp), &stats) < 0)
+            continue;
         }
 
       if (stats.st_size < e->last_size)
@@ -740,7 +744,7 @@ split_line (int idx, const char *str, unsigned long color)
   /* only calculate the continuation's width once */
   if (continuation_width == -1)
     {
-      continuation_length = strlen(continuation);
+      continuation_length = strlen (continuation);
       continuation_width = XmbTextEscapement (fontset, continuation, continuation_length);
     }
 
@@ -764,9 +768,9 @@ split_line (int idx, const char *str, unsigned long color)
 	    {
 	      if (p == beg)
 		{
-		  fprintf(stderr, "we can't even fit a single character onto the line\n");
-		  if (len == 1) fprintf(stderr, "(the character we couldn't fit was '%c')\n", *p);
-		  exit(1);
+		  fprintf (stderr, "we can't even fit a single character onto the line\n");
+		  if (len == 1) fprintf (stderr, "(the character we couldn't fit was '%c')\n", *p);
+		  exit (1);
 		}
 
 	      wrapped = 1;
@@ -801,7 +805,7 @@ split_line (int idx, const char *str, unsigned long color)
 	    memcpy (s + continuation_length, beg, p - beg);
 	  }
 	else
-	    memcpy (s, beg, len);
+	  memcpy (s, beg, len);
 
         s[len] = 0;
         insert_line (idx);
@@ -862,7 +866,7 @@ main_loop (void)
       lines[lin].len = 1;
       display[lin].line = xstrdup("");
       display[lin].len = 0;
-      display[lin].buffer_size = 1;
+      display[lin].buffer_size = 0;
       lines[lin].color = GetColor (def_color);
     }
 
@@ -1135,15 +1139,15 @@ main (int argc, char *argv[])
                 perror ("fdopen"), exit (1);
               if (fcntl (0, F_SETFL, O_NONBLOCK) < 0)
                 perror ("fcntl"), exit (1);
+
               e->fname = NULL;
               e->inode = 0;
               e->desc = xstrdup ("stdin");
             }
           else
             {
-              int l;
-
               e->fname = xstrdup (fname);
+
               if (openlog (e) == NULL)
                 perror (fname), exit (1);
 
@@ -1158,6 +1162,7 @@ main (int argc, char *argv[])
             loglist = e;
           if (loglist_tail)
             loglist_tail->next = e;
+
           loglist_tail = e;
         }
     }

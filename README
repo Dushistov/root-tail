@@ -26,12 +26,12 @@ AUTHORS
    
    Mike Baker <mjbaker@mtu.edu>		   original author
    Ivo van der Wijk <irvdwijk@cs.vu.nl>	   co-author
-   Marc Lehmann <pcg@goof.com>		   lots of bugfixes and improvements
+   Marc Lehmann <pcg@goof.com>		   _lots_ of bugfixes and improvements
+   Chris Moore <chris.moore@mail.com>      _lots_ of bugfixes and improvements
    Olexij Tkatchenko <ot@parcs.de>	   correct refresh ;)
    Daniel Lowe <ashe@sanctuary.org>	   many small improvements
    andre@aleph.it			   signal handling
    Mike Schiraldi <roottail@schiraldi.org> detabification, -noinital bugfix
-   Chris Moore <chris.moore@mail.com>      fixes for partial lines && more
    Mads Martin Joergensen <mmj@panther.mmj.dk> bugfixes
    Didier Verna <didier@lrde.epita.fr>     gnome/kde integration
    ami@fischman.org                        tac
