@@ -537,7 +537,7 @@ concat_line (const char *p1, const char *p2)
 }
 
 /*
- * HACK-1: This routine should read a single line, no matter how long.
+ * This routine can read a line of any length if it is called enough times.
  */
 int
 lineinput (struct logfile_entry *logfile)
