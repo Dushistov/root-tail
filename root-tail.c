@@ -397,12 +397,13 @@ void draw_text (Display *disp, Window root, GC WinGC, int x, int y, struct line_
   if (line->wrapped_right && opt_justify && line->breaks)
     {
       int i;
-      for (i = 0; i < line->num_words; i++) {
+      for (i = 0; i < line->num_words; i++)
         XmbDrawString (disp, root, line->logfile->fontset, WinGC,
-                       x + line->breaks[i].width + ((i * line->free_pixels) / (line->num_words - 1)) + continuation_width * line->wrapped_left, y,
+                       x + line->breaks[i].width + ((i * line->free_pixels) / (line->num_words - 1))
+                         + continuation_width * line->wrapped_left, y,
                        line->line + line->breaks[i].index,
                        line->breaks[i].len);
-      }
+
       if (line->wrapped_left)
         {
           if (foreground) XSetForeground (disp, WinGC, continuation_color);
@@ -411,7 +412,9 @@ void draw_text (Display *disp, Window root, GC WinGC, int x, int y, struct line_
     }
   else
     {
-      XmbDrawString (disp, root, line->logfile->fontset, WinGC, x + continuation_width * line->wrapped_left, y, line->line, line->len);
+      XmbDrawString (disp, root, line->logfile->fontset, WinGC, x + continuation_width * line->wrapped_left,
+                     y, line->line, line->len);
+
       if (line->wrapped_left)
         {
           if (foreground) XSetForeground (disp, WinGC, continuation_color);
