@@ -1,4 +1,4 @@
-//root tail compile time defaults
+/* root tail compile time defaults */
 
 #define DEF_COLOR       "white"
 
@@ -6,10 +6,10 @@
 #define USE_FONT        "fixed"
 
 //default positions.. can be changed with -g at runtime
-#define STD_WIDTH       160
-#define STD_HEIGHT      20
+#define STD_WIDTH       730
+#define STD_HEIGHT      530
 #define LOC_X           30
 #define LOC_Y           30
 
-#define VERSION "0.9"
+#define VERSION "1.0"
 
