@@ -1,7 +1,10 @@
 /*
  * Copyright 2001 by Marco d'Itri <md@linux.it>
- *
- * Original version by Mike Baker, then maintained by pcg@goof.com.
+ * Copyright 2000,2001,2002,2003,2004
+ *           Marc Lehmann <pcg@goof.com>,
+ *           and many others, see README
+ *  
+ * Original version by Mike Baker.
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -379,7 +382,7 @@ void
 refresh (int miny, int maxy, int clear, int refresh_all)
 {
   int lin;
-  int offset = (listlen + 1) * font_height;
+  int offset = listlen * font_height + font_ascent + effect_y_offset;
   unsigned long black_color = GetColor ("black");
 
   miny -= win_y + font_height;
@@ -398,63 +401,53 @@ refresh (int miny, int maxy, int clear, int refresh_all)
       if (offset < miny || offset > maxy)
         continue;
 
-      if (opt_noflicker)
-	{
-	  /* if this line is a different than it was, then it
-	   * needs displaying */
-	  if (refresh_all ||
-	      display_line->len != line->len ||
-	      strcmp(display_line->line, line->line))
-	    {
-	      /* update the record of what has been displayed;
-	       * first make sure the buffer is big enough */
-	      if (display_line->buffer_size <= line->len)
-		{
-		  display_line->buffer_size = line->len + 1;
-		  display_line->line = xrealloc(display_line->line, display_line->buffer_size);
-		}
-	      strcpy(display_line->line, line->line);
-	      display_line->len = line->len;
+      /* if this line is a different than it was, then it
+       * needs displaying */
+      if (refresh_all
+          || display_line->len != line->len
+          || memcmp (display_line->line, line->line, line->len))
+        {
+          /* update the record of what has been displayed;
+           * first make sure the buffer is big enough */
+          if (display_line->buffer_size <= line->len)
+            {
+              display_line->buffer_size = line->len + 1;
+              display_line->line = xrealloc (display_line->line, display_line->buffer_size);
+            }
 
-	      if (clear)
-		XClearArea (disp, root, win_x, win_y + offset - font_height,
-			    width + effect_x_space, font_height + effect_y_space, False);
+          display_line->len = line->len;
+          memcpy (display_line->line, line->line, line->len);
 
-	      if (opt_outline)
-		{
-		  int x, y;
-		  XSetForeground (disp, WinGC, black_color);
+          if (clear)
+            XClearArea (disp, root, win_x, win_y + offset - font_ascent,
+                        width + effect_x_space, font_height + effect_y_space, False);
 
-		  for (x = -1; x < 2; x += 2)
-		    for (y = -1; y < 2; y += 2)
-		      XmbDrawString (disp, root, fontset, WinGC,
-				     win_x + effect_x_offset + x,
-				     win_y + effect_y_offset + y + offset - font_height + font_ascent,
-				     line->line, line->len);
-		}
-	      else if (opt_shade)
-		{
-		  XSetForeground (disp, WinGC, black_color);
-		  XmbDrawString (disp, root, fontset, WinGC,
-				 win_x + effect_x_offset + SHADE_X,
-				 win_y + effect_y_offset + offset + SHADE_Y - font_height + font_ascent,
-				 line->line, line->len);
-		}
+          if (opt_outline)
+            {
+              int x, y;
+              XSetForeground (disp, WinGC, black_color);
 
-	      XSetForeground (disp, WinGC, line->color);
-	      XmbDrawString (disp, root, fontset, WinGC,
-			     win_x + effect_x_offset,
-			     win_y + effect_y_offset + offset - font_height + font_ascent,
-			     line->line, line->len);
-	    }
-	}
-      else
-	{
-	  XSetForeground (disp, WinGC, line->color);
-	  XmbDrawString (disp, root, fontset, WinGC,
-			 win_x + effect_x_offset,
-			 win_y + effect_y_offset + offset - font_height + font_ascent,
-			 line->line, line->len);
+              for (x = -1; x < 2; x += 2)
+                for (y = -1; y < 2; y += 2)
+                  XmbDrawString (disp, root, fontset, WinGC,
+                                 win_x + effect_x_offset + x,
+                                 win_y + y + offset,
+                                 line->line, line->len);
+            }
+          else if (opt_shade)
+            {
+              XSetForeground (disp, WinGC, black_color);
+              XmbDrawString (disp, root, fontset, WinGC,
+                             win_x + effect_x_offset + SHADE_X,
+                             win_y + offset + SHADE_Y,
+                             line->line, line->len);
+            }
+
+          XSetForeground (disp, WinGC, line->color);
+          XmbDrawString (disp, root, fontset, WinGC,
+                         win_x + effect_x_offset,
+                         win_y + offset,
+                         line->line, line->len);
 	}
     }
 
@@ -1301,7 +1294,7 @@ daemonize (void)
     case 0:
       break;
     default:
-      printf("%d\n", pid);
+      /*printf("%d\n", pid);*/
       exit (0);
     }
 
