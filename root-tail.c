@@ -239,11 +239,9 @@ void refresh(struct linematrix *lines, int miny, int maxy)
   
         if (offset < miny || offset > maxy)
           continue;
-  
-        if (opt_reverse)
-            temp = detabificate (lines[listlen-lin-1].line);
-        else
-            temp = detabificate (lines[lin].line);
+
+#define LIN ((opt_reverse)?(listlen-lin-1):(lin))
+        temp = detabificate (lines[LIN].line);
   
         if (opt_shade)
           {
@@ -252,7 +250,7 @@ void refresh(struct linematrix *lines, int miny, int maxy)
                          temp, strlen (temp));
           }
   
-        XSetForeground (disp, WinGC, lines[lin].color);
+        XSetForeground (disp, WinGC, lines[LIN].color);
         XDrawString (disp, root, WinGC, win_x, win_y + offset,
   		   temp, strlen (temp));
         
