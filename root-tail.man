@@ -122,8 +122,8 @@ default 2.4 seconds. Fractional values are OK.
 Print version information.
 .TP
 .B \--frame
-Surround the selected area with a frame. This is just a debugging tool
-and doesn't always work properly. Use it to find the perfect geometry.
+Draw a frame around the selected area.  This is useful when trying to
+find the perfect geometry.
 .IP
 .SH EXAMPLE
 .PP
