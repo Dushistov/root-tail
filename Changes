@@ -1,5 +1,13 @@
 1.1
-	-
+	- added options:
+	    * -justify: gives a smooth right-hand margin
+	    * -cont-color: allows the continuation marker to be a
+	      different color than the logfile text
+	- changed the code around quite a lot - it no longer
+	  continually deletes lines and re-adds them, and the main
+	  structure is now a linked list rather than an array.  the
+	  continuation marker is added at display time, rather than
+	  being in the strings of the datastructure.
 
 1.0   Fri Apr  2 03:37:56 CEST 2004
 	- fix a bug regarding long (>1023 bytes) lines.

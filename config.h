@@ -1,6 +1,8 @@
 /* root tail compile time defaults */
 
 #define DEF_COLOR       "white"
+#define DEF_CONT_COLOR  "grey"
+
 
 //default font.. -font at runtime should work
 #define USE_FONT        "fixed"

@@ -22,6 +22,7 @@
  */
 
 #include "config.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -52,24 +53,39 @@ struct logfile_entry
 {
   struct logfile_entry *next;
 
-  char *fname;                  /* name of file                                */
-  char *desc;                   /* alternative description                     */
-  char *buf;                    /* text read but not yet displayed             */
-  FILE *fp;                     /* FILE struct associated with file            */
-  ino_t inode;                  /* inode of the file opened                    */
-  off_t last_size;              /* file size at the last check                 */
-  unsigned long color;          /* color to be used for printing               */
-  int partial;                  /* true if the last line isn't complete        */
-  int lastpartial;              /* true if the previous output wasn't complete */
-  int index;                    /* index into linematrix of a partial line     */
-  int modified;			/* true if line is modified & needs displaying */
+  char *fname;                  /* name of file                                 */
+  char *desc;                   /* alternative description                      */
+  char *buf;                    /* text read but not yet displayed              */
+  FILE *fp;                     /* FILE struct associated with file             */
+  ino_t inode;                  /* inode of the file opened                     */
+  off_t last_size;              /* file size at the last check                  */
+  unsigned long color;          /* color to be used for printing                */
+  int partial;                  /* true if the last line isn't complete         */
+  int lastpartial;              /* true if the previous output wasn't complete  */
+  struct line_node *last;       /* last line we output                          */
+  int modified;                 /* true if line is modified & needs displaying  */
 };
 
-struct linematrix
+struct line_node
 {
-  char *line;
-  int len;
-  unsigned long color;
+  struct line_node *next;
+  struct line_node *prev;
+  struct logfile_entry *logfile;
+
+  char *line;                   /* the text of the line (so far)                */
+  int len;                      /* the length of the line (in bytes) so far     */
+  int wrapped_left;             /* true if wrapped from the previous line       */
+  int wrapped_right;            /* true if wrapped to the next line             */
+  struct breakinfo *breaks;     /* array of indicies to spaces if wrapped_right */
+  int num_words;                /* the number of words in the line              */
+  int free_pixels;              /* the number of free pixels to spread out      */
+};
+
+struct breakinfo
+{
+  int index;                    /* index into string of start of substring       */
+  int width;                    /* width in pixels of start of substring         */
+  int len;                      /* length of substring                           */
 };
 
 struct displaymatrix
@@ -81,8 +97,14 @@ struct displaymatrix
 };
 
 /* global variables */
-struct linematrix *lines;
+int debug = 1;
+
+struct line_node *linelist = NULL, *linelist_tail = NULL;
 struct displaymatrix *display;
+int continuation_width = -1;
+int continuation_color;
+int continuation_length;
+
 int width = STD_WIDTH, height = STD_HEIGHT, listlen;
 int win_x = LOC_X, win_y = LOC_Y;
 int font_ascent, font_height;
@@ -95,10 +117,10 @@ XFontSet fontset;
 /* command line options */
 int opt_noinitial, opt_shade, opt_frame, opt_reverse, opt_nofilename,
   opt_outline, opt_noflicker, opt_whole, opt_update, opt_wordwrap,
-  geom_mask, reload = 0;
+  opt_justify, geom_mask, reload = 0;
 const char *command = NULL,
   *fontname = USE_FONT, *dispname = NULL, *def_color = DEF_COLOR,
-  *continuation = "[+]";
+  *continuation = "|| ", *cont_color = DEF_CONT_COLOR;
 
 struct logfile_entry *loglist = NULL, *loglist_tail = NULL;
 
@@ -321,16 +343,16 @@ InitWindow (void)
   if (opt_outline)
     {
       /* adding outline increases the total width and height by 2
-	 pixels each, and offsets the text one pixel right and one
-	 pixel down */
+         pixels each, and offsets the text one pixel right and one
+         pixel down */
       effect_x_space = effect_y_space = 2;
       effect_x_offset = effect_y_offset = 1;
     }
   else if (opt_shade)
     {
       /* adding a shadow increases the space used */
-      effect_x_space = abs(SHADE_X);
-      effect_y_space = abs(SHADE_Y);
+      effect_x_space = abs (SHADE_X);
+      effect_y_space = abs (SHADE_Y);
       /* if the shadow is to the right and below then we don't need
        * to move the text to make space for it, but shadows to the left
        * and above need accomodating */
@@ -354,22 +376,16 @@ InitWindow (void)
       listlen = 1;
     }
 
-  /* leave the height how the user requested it.  it might not all be
-   * used, but this will allow the geometry to be tuned more accurately
-   * (with the -frame option)
-   * the old code did this:
-   *   height = listlen * font_height + effect_y_space; */
-  
   XSelectInput (disp, root, ExposureMask | FocusChangeMask);
 }
 
 /*
- * if redraw() is passwd a non-zero argument, it does a complete
+ * if redraw () is passwd a non-zero argument, it does a complete
  * redraw, rather than an update.  if the argument is zero (and
  * -noflicker is in effect) then only the lines which have changed
  * since the last draw are redrawn.
  *
- * the rest is handled by regular refresh()'es
+ * the rest is handled by regular refresh ()'es
  */
 void
 redraw (int redraw_all)
@@ -378,13 +394,55 @@ redraw (int redraw_all)
   refresh (0, 32768, 1, redraw_all);
 }
 
+void draw_text (Display *disp, Window root, XFontSet fontset, GC WinGC, int x, int y, struct line_node *line, int foreground)
+{
+  if (line->wrapped_right && opt_justify && line->breaks)
+    {
+      int i;
+      for (i = 0; i < line->num_words; i++) {
+        XmbDrawString (disp, root, fontset, WinGC,
+                       x + line->breaks[i].width + ((i * line->free_pixels) / (line->num_words - 1)) + continuation_width * line->wrapped_left, y,
+                       line->line + line->breaks[i].index,
+                       line->breaks[i].len);
+      }
+      if (line->wrapped_left)
+        {
+          if (foreground) XSetForeground (disp, WinGC, continuation_color);
+          XmbDrawString (disp, root, fontset, WinGC, x, y, continuation, continuation_length);
+        }
+    }
+  else
+    {
+      XmbDrawString (disp, root, fontset, WinGC, x + continuation_width * line->wrapped_left, y, line->line, line->len);
+      if (line->wrapped_left)
+        {
+          if (foreground) XSetForeground (disp, WinGC, continuation_color);
+          XmbDrawString (disp, root, fontset, WinGC, x, y, continuation, continuation_length);
+        }
+    }
+}
+
 /* Just redraw everything without clearing (i.e. after an EXPOSE event) */
 void
 refresh (int miny, int maxy, int clear, int refresh_all)
 {
-  int lin;
-  int offset = listlen * font_height + font_ascent + effect_y_offset;
+  int lin = 0;
+  int offset;
   unsigned long black_color = GetColor ("black");
+  struct line_node *line;
+  int step_per_line;
+  int foreground = 0;
+
+  if (opt_reverse)
+    {
+      step_per_line = font_height;
+      offset = font_ascent + effect_y_offset;
+    }
+  else
+    {
+      step_per_line = -font_height;
+      offset = (listlen - 1) * font_height + font_ascent + effect_y_offset;
+    }
 
   miny -= win_y + font_height;
   maxy -= win_y - font_height;
@@ -392,12 +450,9 @@ refresh (int miny, int maxy, int clear, int refresh_all)
   if (clear && !opt_noflicker)
     XClearArea (disp, root, win_x, win_y, width, height, False);
 
-  for (lin = listlen; lin--;)
+  for (line = linelist; line && lin < listlen; line = line->next, lin++, offset += step_per_line)
     {
-      struct linematrix *line = lines + (opt_reverse ? listlen - lin - 1 : lin);
       struct displaymatrix *display_line = display + lin;
-
-      offset -= font_height;
 
       if (offset < miny || offset > maxy)
         continue;
@@ -405,32 +460,32 @@ refresh (int miny, int maxy, int clear, int refresh_all)
       /* if this line is a different than it was, then it
        * needs displaying */
       if (!opt_noflicker
-	  || refresh_all
+          || refresh_all
           || display_line->len != line->len
-          || display_line->color != line->color
+          || display_line->color != line->logfile->color
           || memcmp (display_line->line, line->line, line->len))
         {
-	  /* don't bother updating the record of what has been
-	   * displayed if -noflicker isn't in effect, since we redraw
-	   * the whole display every time anyway */
-	  if (opt_noflicker)
-	    {
-	      /* update the record of what has been displayed;
-	       * first make sure the buffer is big enough */
-	      if (display_line->buffer_size < line->len)
-		{
-		  display_line->buffer_size = line->len;
-		  display_line->line = xrealloc (display_line->line, display_line->buffer_size);
-		}
+          /* don't bother updating the record of what has been
+           * displayed if -noflicker isn't in effect, since we redraw
+           * the whole display every time anyway */
+          if (opt_noflicker)
+            {
+              /* update the record of what has been displayed;
+               * first make sure the buffer is big enough */
+              if (display_line->buffer_size < line->len)
+                {
+                  display_line->buffer_size = line->len;
+                  display_line->line = xrealloc (display_line->line, display_line->buffer_size);
+                }
 
-	      display_line->len = line->len;
-	      display_line->color = line->color;
-	      memcpy (display_line->line, line->line, line->len);
+              display_line->len = line->len;
+              display_line->color = line->logfile->color;
+              memcpy (display_line->line, line->line, line->len);
 
-	      if (clear)
-		XClearArea (disp, root, win_x, win_y + offset - font_ascent,
-			    width + effect_x_space, font_height + effect_y_space, False);
-	    }
+              if (clear)
+                XClearArea (disp, root, win_x, win_y + offset - font_ascent,
+                            width + effect_x_space, font_height + effect_y_space, False);
+            }
 
           if (opt_outline)
             {
@@ -439,26 +494,38 @@ refresh (int miny, int maxy, int clear, int refresh_all)
 
               for (x = -1; x <= 1; x += 2)
                 for (y = -1; y <= 1; y += 2)
-                  XmbDrawString (disp, root, fontset, WinGC,
-                                 win_x + effect_x_offset + x,
-                                 win_y + y + offset,
-                                 line->line, line->len);
+                  draw_text (disp, root, fontset, WinGC,
+                             win_x + effect_x_offset + x,
+                             win_y + y + offset, line, foreground = 0);
             }
           else if (opt_shade)
             {
               XSetForeground (disp, WinGC, black_color);
-              XmbDrawString (disp, root, fontset, WinGC,
-                             win_x + effect_x_offset + SHADE_X,
-                             win_y + offset + SHADE_Y,
-                             line->line, line->len);
+              draw_text (disp, root, fontset, WinGC,
+                         win_x + effect_x_offset + SHADE_X,
+                         win_y + offset + SHADE_Y, line, foreground = 0);
             }
 
-          XSetForeground (disp, WinGC, line->color);
-          XmbDrawString (disp, root, fontset, WinGC,
-                         win_x + effect_x_offset,
-                         win_y + offset,
-                         line->line, line->len);
-	}
+          XSetForeground (disp, WinGC, line->logfile->color);
+          draw_text (disp, root, fontset, WinGC,
+                     win_x + effect_x_offset,
+                     win_y + offset, line, foreground = 1);
+        }
+    }
+
+  /* any lines that didn't just get looked at are never going to be, so break the chain */
+  if (line) line->prev->next = 0;
+
+  /* and throw them all away */
+  while (line)
+    {
+      struct line_node *this = line;
+      line = line->next;
+      if (this->logfile && this->logfile->last == this)
+        this->logfile->last = NULL;
+      free (this->line);
+      free (this->breaks);
+      free (this);
     }
 
   if (opt_frame)
@@ -490,46 +557,54 @@ transform_line (char *s)
       i = regexec (transformre, s, 16, matched, 0);
       if (i == 0)
         {                       /* matched */
-	  int match_start = matched[0].rm_so;
-	  int match_end = matched[0].rm_eo;
-	  int old_len = match_end - match_start;
-	  int new_len = strlen (transform_to);
-	  int old_whole_len = strlen (s);
+          int match_start = matched[0].rm_so;
+          int match_end = matched[0].rm_eo;
+          int old_len = match_end - match_start;
+          int new_len = strlen (transform_to);
+          int old_whole_len = strlen (s);
 
-	  printf ("regexp was matched by '%s' - replace with '%s'\n", s, transform_to);
-	  printf ("match is from %d to %d\n", match_start, match_end);
-	  if (new_len > old_len)
-	    s = xrealloc(s, old_whole_len + new_len - old_len);
-	  
-	  if (new_len != old_len)
+          printf ("regexp was matched by '%s' - replace with '%s'\n", s, transform_to);
+          printf ("match is from %d to %d\n", match_start, match_end);
+          if (new_len > old_len)
+            s = xrealloc (s, old_whole_len + new_len - old_len);
+          
+          if (new_len != old_len)
             {
-              memcpy(s + match_end + new_len - old_len,
-                     s + match_end,
-                     old_whole_len - match_end);
+              memcpy (s + match_end + new_len - old_len,
+                      s + match_end,
+                      old_whole_len - match_end);
               s[old_whole_len + new_len - old_len] = '\0';
             }
 
-	  memcpy (s + match_start,
-		  transform_to,
-		  new_len);
-	  printf ("transformed to '%s'\n", s);
+          memcpy (s + match_start,
+                  transform_to,
+                  new_len);
+          printf ("transformed to '%s'\n", s);
         }
       else
-	{
-	  printf ("regexp was not matched by '%s'\n", s);
-	}
+        printf ("regexp was not matched by '%s'\n", s);
     }
 }
 #endif
 
+/*
+ * appends p2 to the end of p1, if p1 is not null
+ * otherwise allocates a new string and copies p2 to it
+ */
 char *
-concat_line (const char *p1, const char *p2)
+concat_line (char *p1, const char *p2)
 {
+  assert(p2);
+
   int l1 = p1 ? strlen (p1) : 0;
   int l2 = strlen (p2);
-  char *r = xmalloc (l1 + l2 + 1);
+  char *r;
 
-  memcpy (r, p1, l1);
+  if (p1)
+    r = xrealloc(p1, l1 + l2 + 1);
+  else
+    r = xmalloc (l2 + 1);
+
   memcpy (r + l1, p2, l2);
   r[l1 + l2] = 0;
 
@@ -555,37 +630,36 @@ lineinput (struct logfile_entry *logfile)
     {
       p = buff;
       do
-	{
-	  ch = fgetc (logfile->fp);
+        {
+          ch = fgetc (logfile->fp);
 
-	  if (ch == '\n' || ch == EOF)
-	    break;
-	  else if (ch == '\r')
-	    continue; /* skip */
-	  else if (ch == '\t')
-	    {
-	      do
-		{
-		  *p++ = ' ';
-		  ofs++;
-		}
-	      while (ofs & 7);
-	    }
-	  else
-	    {
-	      *p++ = ch;
-	      ofs++;
-	    }
-	}
+          if (ch == '\n' || ch == EOF)
+            break;
+          else if (ch == '\r')
+            continue; /* skip */
+          else if (ch == '\t')
+            {
+              do
+                {
+                  *p++ = ' ';
+                  ofs++;
+                }
+              while (ofs & 7);
+            }
+          else
+            {
+              *p++ = ch;
+              ofs++;
+            }
+        }
       while (p < buff + (sizeof buff) - 8 - 1);
 
       if (p == buff && ch == EOF)
-	return 0;
+        return 0;
 
       *p = 0;
 
-      p = concat_line (logfile->buf, buff);
-      free (logfile->buf); logfile->buf = p;
+      p = logfile->buf = concat_line (logfile->buf, buff);
     }
   while (ch != '\n' && ch != EOF);
 
@@ -633,7 +707,8 @@ openlog (struct logfile_entry * file)
   if (opt_noinitial)
     fseek (file->fp, 0, SEEK_END);
   else if (stats.st_size > (listlen + 1) * width)
-    fseek (file->fp, -((listlen + 2) * width), SEEK_END);
+    /* HACK - 'width' is in pixels - how are we to know how much text will fit? */
+    fseek (file->fp, -((listlen + 2) * width/10), SEEK_END);
 
   file->last_size = stats.st_size;
   return file->fp;
@@ -699,102 +774,151 @@ check_open_files (void)
 }
 
 /*
- * insert a single physical line (that must be short enough to fit)
- * at position "idx" by pushing up lines above it. the caller
- * MUST then fill in lines[idx] with valid data.
+ * insert a single node in the list of screen lines and return a
+ * pointer to the new node.
+ * the caller MUST then fill in ret->line and ret->len with valid
+ * data.
  */
-static void
-insert_line (int idx)
+static struct line_node *
+new_line_node (struct logfile_entry *log)
 {
-  int cur_line;
-  struct logfile_entry *current;
+  struct line_node *new = xmalloc (sizeof (struct line_node));
 
-  free (lines[0].line);
+  new->logfile = log;
+  new->wrapped_left = 0;
+  new->wrapped_right = 0;
+  new->breaks = 0;
 
-  for (cur_line = 0; cur_line < idx; cur_line++)
-    lines[cur_line] = lines[cur_line + 1];
+  assert(log);
 
-  for (current = loglist; current; current = current->next)
-    if (current->index <= idx)
-      current->index--;
+  if (!log || !log->last)
+    {
+      new->next = linelist;
+      new->next->prev = new;
+
+      new->prev = NULL;
+      linelist = new;
+    }
+  else
+    {
+      /* 2 pointers from the new node */
+      new->next = log->last;
+      new->prev = log->last->prev;
+
+      /* 2 pointers back to the new node */
+      if (new->next) new->next->prev = new;
+      if (new->prev) new->prev->next = new;
+
+      /* if this is a new first entry in the list then update
+       * 'linelist' */
+      if (log->last == linelist)
+        linelist = new;
+    }
+
+  /* update the logfile record */
+  if (log)
+    log->last = new;
+
+  return new;
 }
 
 /*
- * remove a single physical line at position "idx" by moving the lines above it
- * down and inserting a "~" line at the top.
+ * this is called after either adding a new line or appending to an
+ * old one.  in both cases it's possible that the line no longer fits,
+ * and needs wrapping.  this function checks the last line associated
+ * with the supplied logfile.
  */
 static void
-delete_line (int idx)
+possibly_split_long_line (struct logfile_entry *log)
 {
-  int cur_line;
-  struct logfile_entry *current;
-
-  free (lines[idx].line);
-
-  for (cur_line = idx; cur_line > 0; cur_line--)
-    lines[cur_line] = lines[cur_line - 1];
-
-  lines[0].line = xstrdup ("~");
-
-  for (current = loglist; current; current = current->next)
-    if (current->index >= 0 && current->index <= idx)
-      current->index++;
-}
-
-/*
- * takes a logical log file line and splits it into multiple physical
- * screen lines by splitting it whenever a part becomes too long.
- * lal lines will be inserted at position "idx".
- */
-static void
-split_line (int idx, const char *str, unsigned long color)
-{
+  char *str = log->last->line;
   int l = strlen (str);
-  int last_wrapped = 0;
-  const char *p = str;
-  static int continuation_width = -1;
-  static int continuation_length;
+  char *p = str;
+  struct line_node *line;
+  int spaces;
+  static struct breakinfo *breaks;
+  static int break_buffer_size;
 
   /* only calculate the continuation's width once */
   if (continuation_width == -1)
     {
       continuation_length = strlen (continuation);
       continuation_width = XmbTextEscapement (fontset, continuation, continuation_length);
+      continuation_color = GetColor (cont_color);
+
+      /* make an array to store information about the location of
+       * spaces in the line */
+      if (opt_justify)
+        {
+          break_buffer_size = 32;
+          breaks = xmalloc (break_buffer_size * sizeof (struct breakinfo));
+        }
     }
 
   do
     {
       const char *beg = p;
-      int w = last_wrapped ? continuation_width : 0;
+      int start_w = log->last->wrapped_left ? continuation_width : 0;
+      int w = start_w;
       int wrapped = 0;
-      const char *break_p = NULL;
+      char *break_p = NULL;
+      int width_at_break_p;
+      spaces = 0;
+
+      if (opt_justify)
+        breaks[spaces].index = breaks[spaces].width = 0;
 
       while (*p)
         {
           int cw, len;
 
-	  /* find the length in bytes of the next multibyte character */
+          /* find the length in bytes of the next multibyte character */
           len = mblen (p, l);
           if (len <= 0)
             len = 1; /* ignore (don't skip) illegal character sequences */
 
-	  /* find the width in pixels of the next character */
+          /* find the width in pixels of the next character */
           cw = XmbTextEscapement (fontset, p, len);
+
+          if (opt_wordwrap && len == 1 && p[0] == ' ' && p != break_p + 1)
+            {
+              break_p = p;
+              width_at_break_p = w;
+              spaces++;
+
+              if (opt_justify)
+                {
+                  /* increase the size of the 'breaks' array when
+                   * necessary */
+                  if (spaces >= break_buffer_size)
+                    {
+                      break_buffer_size *= 1.5;
+                      breaks = xrealloc (breaks, break_buffer_size * sizeof (struct breakinfo));
+                    }
+
+                  /* store information about (a) the location of each
+                   * space */
+                  breaks[spaces].index = p + 1 - beg;
+                  /* (b) the width (in pixels) of the string up to
+                   * this space */
+                  breaks[spaces].width = cw + w - start_w;
+                  /* (c) the length of each 'word' */
+                  breaks[spaces-1].len = breaks[spaces].index - breaks[spaces-1].index;
+                }
+            }
+
           if (cw + w > width - effect_x_space)
-	    {
-	      if (p == beg)
-		{
-		  fprintf (stderr, "we can't even fit a single character onto the line\n");
-		  if (len == 1) fprintf (stderr, "(the character we couldn't fit was '%c')\n", *p);
-		  exit (1);
-		}
+            {
+              if (p == beg)
+                {
+                  fprintf (stderr, "we can't even fit a single character onto the line\n");
+                  if (len == 1) fprintf (stderr, "(the character we couldn't fit was '%c')\n", *p);
+                  exit (1);
+                }
 
-	      wrapped = 1;
-	      break;
-	    }
-
-	  if (opt_wordwrap && len == 1 && p[0] == ' ')
-	    break_p = p;
+              wrapped = 1;
+              break;
+            }
 
           w += cw;
           p += len;
@@ -804,40 +928,78 @@ split_line (int idx, const char *str, unsigned long color)
       /* if we're wrapping at spaces, and the line is long enough to
        * wrap, and we've seen a space already, and the space wasn't
        * the first character on the line, then wrap at the space */
-      if (opt_wordwrap && wrapped && break_p && break_p != beg)
-	{
-	  l += p - break_p;
-	  p = break_p;
-	}
+      if (!wrapped)
+        break;
+      
+      int prefix_len;
 
-      {
-	int len = p - beg + (last_wrapped ? continuation_length : 0);
-        char *s = xmalloc (len + 1);
-	if (last_wrapped)
-	  {
-	    memcpy (s, continuation, continuation_length);
-	    memcpy (s + continuation_length, beg, p - beg);
-	  }
-	else
-	  memcpy (s, beg, len);
+      /* choose where to break the line */
+      if (opt_wordwrap && break_p && break_p != beg)
+        {
+          prefix_len = break_p - beg;
+          p = break_p;
+          w = width_at_break_p;
 
-        s[len] = 0;
-        insert_line (idx);
-        lines[idx].line = s;
-        lines[idx].len = len;
-        lines[idx].color = color;
-      }
+          /* if breaking at a space, skip all adjacent spaces */
+          while (*p == ' ')
+            {
+              int len = mblen (p, l);
+              if (len != 1) break;
+              p++;
+            }
 
-      /* if we wrapped at a space, don't display the space */
-      if (opt_wordwrap && wrapped && break_p && break_p != beg)
-	{
-	  l--;
-	  p++;
-	}
+          if (opt_justify)
+            {
+              spaces--;
+              breaks[spaces].len--;
+            }
+        }
+      else
+        prefix_len = p - beg;
+        
+      /* make a copy of the tail end of the string */
+      p = xstrdup (p);
 
-      last_wrapped = wrapped;
+      /* and reduce the size of the head of the string */
+      log->last->line = xrealloc (log->last->line, prefix_len + 1);
+      log->last->len = prefix_len;
+      log->last->line[prefix_len] = '\0';
+
+      /* note that the head was wrapped on it's right */
+      log->last->wrapped_right = 1;
+
+      /* 'spaces' includes any space we broke on; we can only justify
+       * if there's at least one other space */
+      if (opt_justify && spaces &&
+          width - effect_x_space - width_at_break_p < spaces * font_height)
+        {
+          int i;
+          log->last->free_pixels = width - w;
+          log->last->num_words = spaces + 1;
+          log->last->breaks = malloc (log->last->num_words * sizeof (struct breakinfo));
+          for (i = 0; i < log->last->num_words; i++)
+            log->last->breaks[i] = breaks[i];
+        }
+        
+      line = new_line_node (log);
+      line->line = p;
+      l = line->len = strlen (p);
+
+      /* note that the tail end of the string is wrapped at its left */
+      line->wrapped_left = 1;
     }
   while (l);
+}
+
+static void
+insert_new_line (char *str, struct logfile_entry *log)
+{
+  struct line_node *new;
+  new = new_line_node (log);
+  new->line = str;
+  new->len = strlen (str);
+
+  possibly_split_long_line (log);
 }
 
 /*
@@ -846,15 +1008,21 @@ split_line (int idx, const char *str, unsigned long color)
  * and splitting it again.
  */
 static void
-append_line (int idx, const char *str)
+append_to_existing_line (char *str, struct logfile_entry *log)
 {
-  unsigned long color = lines[idx].color;
-  char *old = lines[idx].line;
-  char *new = concat_line (old, str);
+  char *old, *new;
 
-  delete_line (idx);
-  split_line (idx, new, color);
-  free (new);
+  assert(log);
+  assert(log->last);
+
+  old = log->last->line;
+  assert(old);
+
+  new = concat_line (old, str);
+  free (str);
+  log->last->line = new;
+  log->last->len = strlen (new);
+  possibly_split_long_line (log); 
 }
 
 static void
@@ -868,20 +1036,32 @@ main_loop (void)
   struct logfile_entry *current;
   int need_update = 1;
 
-  lines = xmalloc (sizeof (struct linematrix) * listlen);
   display = xmalloc (sizeof (struct displaymatrix) * listlen);
 
   lastreload = time (NULL);
 
-  /* Initialize linematrix */
+  /* Initialize line_node */
   for (lin = 0; lin < listlen; lin++)
     {
-      lines[lin].line = xstrdup ("~");
-      lines[lin].len = 1;
-      display[lin].line = xstrdup("");
+      struct line_node *e = xmalloc (sizeof (struct line_node));
+      e->line = xstrdup ("~");
+      e->len = 1;
+      e->logfile = loglist;     /* this is only needed to get a color for the '~' */
+      e->wrapped_left = 0;
+      e->wrapped_right = 0;
+      e->breaks = 0;
+      e->next = NULL;
+      e->prev = linelist_tail;
+
+      if (!linelist)
+        linelist = e;
+      if (linelist_tail)
+        linelist_tail->next = e;
+      linelist_tail = e;
+
+      display[lin].line = xstrdup ("");
       display[lin].len = 0;
       display[lin].buffer_size = 0;
-      lines[lin].color = GetColor (def_color);
     }
 
   for (;;)
@@ -902,12 +1082,19 @@ main_loop (void)
                * output was partial, and that partial line is not
                * too close to the top of the screen, then update
                * that partial line */
-              if (opt_update && current->lastpartial && current->index >= 0)
+              if (opt_update && current->lastpartial && current->last)
                 {
-                  int idx = current->index;
-                  append_line (idx, current->buf);
-                  current->index = idx;
-                  free (current->buf), current->buf = 0;
+                  // int idx = current->index;
+                  append_to_existing_line (current->buf, current);
+                  // current->index = idx;
+                  current->buf = 0;
+                  continue;
+                }
+
+              /* if all we just read was a newline ending a line that we've already displayed, skip it */
+              if (current->buf[0] == '\0' && current->lastpartial)
+                {
+                  current->buf = 0;
                   continue;
                 }
 
@@ -915,34 +1102,35 @@ main_loop (void)
                * different file */
               if (!opt_nofilename && lastprinted != current && current->desc[0])
                 {
-                  split_line (listlen - 1, "[", current->color);
-                  append_line (listlen - 1, current->desc);
-                  append_line (listlen - 1, "]");
+                  current->last = 0;
+                  insert_new_line (xstrdup ("["), current);
+                  append_to_existing_line (xstrdup (current->desc), current);
+                  append_to_existing_line (xstrdup ("]"), current);
                 }
 
               /* if we're dealing with partial lines, and the last
                * time we showed the line it wasn't finished ... */
               if (!opt_whole && current->lastpartial)
-		{
-		  /* if this is the same file we showed last then
-		     append to the last line shown */
-		  if (lastprinted == current)
-		    append_line (listlen - 1, current->buf);
-		  else
-		    {
-		      /* but if a different file has been shown in the
-		       * mean time, make a new line, starting with the
-		       * continuation string */
-		      split_line (listlen - 1, continuation, current->color);
-		      append_line (listlen - 1, current->buf);
-		    }
-		}
+                {
+                  /* if this is the same file we showed last then
+                     append to the last line shown */
+                  if (lastprinted == current)
+                    append_to_existing_line (current->buf, current);
+                  else
+                    {
+                      /* but if a different file has been shown in the
+                       * mean time, make a new line, starting with the
+                       * continuation string */
+                      insert_new_line (current->buf, current);
+                      current->last->wrapped_left = 1;
+                    }
+                }
               else
-		/* otherwise just make a plain and simple new line */
-		split_line (listlen - 1, current->buf, current->color);
+                /* otherwise just make a plain and simple new line */
+                insert_new_line (current->buf, current);
 
-	      free (current->buf), current->buf = 0;
-              current->index = listlen - 1;
+              current->buf = 0;
+              // current->index = listlen - 1;
               lastprinted = current;
             }
         }
@@ -1063,15 +1251,17 @@ main (int argc, char *argv[])
             dispname = argv[++i];
           else if (!strcmp (arg, "-cont"))
             continuation = argv[++i];
+          else if (!strcmp (arg, "-cont-color"))
+            cont_color = argv[++i];
           else if (!strcmp (arg, "-font") || !strcmp (arg, "-fn"))
             fontname = argv[++i];
 #if HAS_REGEX
           else if (!strcmp (arg, "-t"))
-	    {
-	      transform = argv[++i];
-	      transform_to = argv[++i];
-	      printf("transform: '%s' to '%s'\n", transform, transform_to);
-	    }
+            {
+              transform = argv[++i];
+              transform_to = argv[++i];
+              printf ("transform: '%s' to '%s'\n", transform, transform_to);
+            }
 #endif
           else if (!strcmp (arg, "-fork") || !strcmp (arg, "-f"))
             opt_daemonize = 1;
@@ -1100,6 +1290,8 @@ main (int argc, char *argv[])
             opt_update = opt_partial = 1;
           else if (!strcmp (arg, "-wordwrap"))
             opt_wordwrap = 1;
+          else if (!strcmp (arg, "-justify"))
+            opt_justify = 1;
           else if (!strcmp (arg, "-color"))
             def_color = argv[++i];
           else if (!strcmp (arg, "-noinitial"))
@@ -1145,7 +1337,7 @@ main (int argc, char *argv[])
           e = xmalloc (sizeof (struct logfile_entry));
           e->partial = 0;
           e->buf = 0;
-          e->index = -1;
+          // e->index = -1;
 
           if (arg[0] == '-' && arg[1] == '\0')
             {
@@ -1170,6 +1362,7 @@ main (int argc, char *argv[])
 
           e->color = GetColor (fcolor);
           e->partial = 0;
+          e->last = NULL;
           e->next = NULL;
 
           if (!loglist)
@@ -1199,6 +1392,10 @@ main (int argc, char *argv[])
       exit (1);
     }
 
+  /* it doesn't make sense to justify if word wrap isn't on */
+  if (opt_justify)
+    opt_wordwrap = 1;
+
   /* HACK-7: do we want to allow both -shade and -outline? */
   if (opt_shade && opt_outline)
     {
@@ -1218,7 +1415,7 @@ main (int argc, char *argv[])
     {
       int i;
 
-      printf("compiling regexp '%s'\n", transform);
+      printf ("compiling regexp '%s'\n", transform);
       transformre = xmalloc (sizeof (regex_t));
       i = regcomp (transformre, transform, REG_EXTENDED);
       if (i != 0)
@@ -1229,9 +1426,7 @@ main (int argc, char *argv[])
           fprintf (stderr, "Cannot compile regular expression: %s\n", buf);
         }
       else
-	{
-	  printf("compiled '%s' OK to %x\n", transform, (int)transformre);
-	}
+        printf ("compiled '%s' OK to %x\n", transform, (int)transformre);
     }
 #endif
 
@@ -1262,7 +1457,7 @@ install_signal (int sig, void (*handler) (int))
   action.sa_flags = SA_RESTART;
 
   if (sigaction (sig, &action, NULL) < 0)
-    fprintf (stderr, "sigaction(%d): %s\n", sig, strerror (errno)), exit (1);
+    fprintf (stderr, "sigaction (%d): %s\n", sig, strerror (errno)), exit (1);
 }
 
 void *
@@ -1272,7 +1467,7 @@ xstrdup (const char *string)
 
   while ((p = strdup (string)) == NULL)
     {
-      fprintf (stderr, "Memory exhausted in xstrdup().\n");
+      fprintf (stderr, "Memory exhausted in xstrdup ().\n");
       sleep (10);
     }
 
@@ -1286,7 +1481,7 @@ xmalloc (size_t size)
 
   while ((p = malloc (size)) == NULL)
     {
-      fprintf (stderr, "Memory exhausted in xmalloc().\n");
+      fprintf (stderr, "Memory exhausted in xmalloc ().\n");
       sleep (10);
     }
 
@@ -1300,7 +1495,7 @@ xrealloc (void *ptr, size_t size)
 
   while ((p = realloc (ptr, size)) == NULL)
     {
-      fprintf (stderr, "Memory exhausted in xrealloc().\n");
+      fprintf (stderr, "Memory exhausted in xrealloc ().\n");
       sleep (10);
     }
 
@@ -1356,7 +1551,7 @@ daemonize (void)
     case 0:
       break;
     default:
-      /*printf("%d\n", pid);*/
+      /*printf ("%d\n", pid);*/
       exit (0);
     }
 
@@ -1365,3 +1560,5 @@ daemonize (void)
 
   return 0;
 }
+
+/* todo - get reverse display working again */
