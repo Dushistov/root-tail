@@ -417,7 +417,7 @@ refresh (int miny, int maxy, int clear, int refresh_all)
 	    {
 	      /* update the record of what has been displayed;
 	       * first make sure the buffer is big enough */
-	      if (display_line->buffer_size <= line->len)
+	      if (display_line->buffer_size < line->len)
 		{
 		  display_line->buffer_size = line->len;
 		  display_line->line = xrealloc (display_line->line, display_line->buffer_size);
@@ -1259,7 +1259,7 @@ xstrdup (const char *string)
 
   while ((p = strdup (string)) == NULL)
     {
-      fprintf (stderr, "Memory exausted.");
+      fprintf (stderr, "Memory exhausted in xstrdup().\n");
       sleep (10);
     }
 
@@ -1273,7 +1273,7 @@ xmalloc (size_t size)
 
   while ((p = malloc (size)) == NULL)
     {
-      fprintf (stderr, "Memory exausted.");
+      fprintf (stderr, "Memory exhausted in xmalloc().\n");
       sleep (10);
     }
 
@@ -1287,7 +1287,7 @@ xrealloc (void *ptr, size_t size)
 
   while ((p = realloc (ptr, size)) == NULL)
     {
-      fprintf (stderr, "Memory exausted.");
+      fprintf (stderr, "Memory exhausted in xrealloc().\n");
       sleep (10);
     }
 
