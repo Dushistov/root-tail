@@ -70,12 +70,12 @@ int width = STD_WIDTH, height = STD_HEIGHT, listlen;
 int win_x = LOC_X, win_y = LOC_Y;
 int font_descent, font_height;
 int do_reopen;
-struct timeval interval = { 3, 0 };
+struct timeval interval = { 2, 400000 };
 XFontSet fontset;
 
 /* command line options */
 int opt_noinitial, opt_shade, opt_frame, opt_reverse, opt_nofilename,
-  opt_whole, opt_update, geom_mask, reload = 0;
+  opt_outline, opt_whole, opt_update, geom_mask, reload = 0;
 const char *command = NULL,
   *fontname = USE_FONT, *dispname = NULL, *def_color = DEF_COLOR,
   *continuation = "[+]";
@@ -342,7 +342,19 @@ refresh (int miny, int maxy)
       if (offset < miny || offset > maxy)
         continue;
 
-      if (opt_shade)
+      if (opt_outline)
+        {
+          XSetForeground (disp, WinGC, black_color);
+          XmbDrawString (disp, root, fontset, WinGC, win_x - 1,
+                         win_y + offset + 1, line->line, line->len);
+          XmbDrawString (disp, root, fontset, WinGC, win_x + 1,
+                         win_y + offset + 1, line->line, line->len);
+          XmbDrawString (disp, root, fontset, WinGC, win_x - 1,
+                         win_y + offset - 1, line->line, line->len);
+          XmbDrawString (disp, root, fontset, WinGC, win_x + 1,
+                         win_y + offset - 1, line->line, line->len);
+        }
+      else if (opt_shade)
         {
           XSetForeground (disp, WinGC, black_color);
           XmbDrawString (disp, root, fontset, WinGC, win_x + 2,
@@ -859,6 +871,8 @@ main (int argc, char *argv[])
             }
           else if (!strcmp (arg, "-shade"))
             opt_shade = 1;
+          else if (!strcmp (arg, "-outline"))
+            opt_outline = 1;
           else if (!strcmp (arg, "-frame"))
             opt_frame = 1;
           else if (!strcmp (arg, "-no-filename"))
@@ -1072,7 +1086,7 @@ display_help (char *myname)
           " -noinitial                don't display the last file lines on\n"
           "                           startup\n"
           " -i | -interval seconds    interval between checks (fractional\n"
-          "                           values o.k.). Default 3 seconds\n"
+          "                           values o.k.). Default 2.4 seconds\n"
           " -V                        display version information and exit\n"
           "\n");
   printf ("Example:\n%s -g 80x25+100+50 -font fixed /var/log/messages,green "

@@ -1,4 +1,4 @@
-.TH ROOTTAIL 1 "Nov 13, 2000" "Version 0.0.10"
+.TH ROOTTAIL 1 "2004-03-27" "Version 1.0"
 .UC 5
 .SH NAME
 root-tail \- print text directly to X11 root window
@@ -14,6 +14,7 @@ root-tail \- print text directly to X11 root window
 .IR SEC
 .IR COMMAND ]
 .RB [ \-shade ]
+.RB [ \-outline ]
 .RB [ \-f \|| \-fork ]
 .RB [ \-reverse ]
 .RB [ \-whole ]
@@ -80,7 +81,10 @@ Re-display the file(s) and run COMMAND every SEC seconds.  The
 default is to never re-display the file(s).
 .TP
 .B \-shade
-Add shading to the font.
+Add black shading to the font.
+.TP
+.B \-outline
+Add black outline to the font.
 .TP
 .B \-noinitial
 Don't display the end of the file(s) initially.
@@ -90,7 +94,7 @@ Use the given window ID for output instead of the root window.
 .TP
 .BI "\-i \|| \-interval" " SECONDS"
 Use the specified sleeping interval between checks instead of the
-default 3 seconds. Fractional values are OK.
+default 2.4 seconds. Fractional values are OK.
 .TP
 .B \-V
 Print version information.
