@@ -862,7 +862,7 @@ possibly_split_long_line (struct logfile_entry *log)
       int w = start_w;
       int wrapped = 0;
       char *break_p = NULL;
-      int width_at_break_p;
+      int width_at_break_p = 0;
       spaces = 0;
 
       if (opt_justify)
