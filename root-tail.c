@@ -660,13 +660,12 @@ check_open_files (void)
           sleep (1);
           if (e->fp)
             fclose (e->fp);
-          openlog (e);
-          continue;
+          if (openlog (e) == NULL)
+            continue;
+          if (fstat (fileno (e->fp), &stats) < 0)
+            continue;
         }
 
-      /* HACK-3: stats can be uninitialised here (if the file didn't
-       * exist when stat() was called, but was recreated during the
-       * sleep(1)) */
       if (stats.st_ino != e->inode)
         {                       /* file renamed? */
           if (e->fp)
