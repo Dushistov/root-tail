@@ -355,7 +355,10 @@ refresh (int miny, int maxy)
     }
 
   if (opt_frame)
-    XDrawRectangle (disp, root, WinGC, win_x - 2, win_y - 2, width + 4, height + 4);
+    {
+      XSetForeground (disp, WinGC, GetColor (def_color));
+      XDrawRectangle (disp, root, WinGC, win_x - 2, win_y - 2, width + 4, height + 4);
+    }
 }
 
 #if HAS_REGEX
@@ -642,7 +645,6 @@ append_line (int idx, const char *str)
   char *new = concat_line (old, str);
 
   free (old);
-  free (str);
 
   delete_line (idx);
   split_line (idx, new, color);
@@ -803,7 +805,7 @@ main_loop (void)
           XDestroyRegion (region);
           region = XCreateRegion ();
           maxy = 0;
-          miny = win_y + height;
+          miny = 32768;
         }
     }
 }
