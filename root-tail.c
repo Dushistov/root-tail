@@ -148,7 +148,7 @@ force_refresh (int dummy)
 void
 blank_window (int dummy)
 {
-  XClearArea (disp, root, win_x, win_y, width, height, False);
+  XClearArea (disp, root, win_x - 2, win_y - 2, width + 5, height + 5, False);
   XFlush (disp);
   exit (0);
 }
@@ -317,7 +317,7 @@ InitWindow (void)
 void
 redraw (void)
 {
-  XClearArea (disp, root, win_x, win_y, width, height, False);
+  XClearArea (disp, root, win_x - 2, win_y - 2, width + 5, height + 5, False);
   refresh (0, 32768);
 }
 
@@ -437,7 +437,7 @@ lineinput (struct logfile_entry *logfile)
     }
   while (p < buff + (sizeof buff) - 8 - 1);
 
-  if (p == buff)
+  if (p == buff && ch == EOF)
     return 0;
 
   *p = 0;
@@ -686,7 +686,6 @@ main_loop (void)
 
           while (lineinput (current))
             {
-             fprintf (stderr, "got line <%s>\n", current->buf);//D
               need_update = 1;
               /* if we're trying to update old partial lines in
                * place, and the last time this file was updated the

@@ -1,7 +1,7 @@
 1.0
         - -geometry now expects _pixels_ not _characters_.
         - sped up redraws considerably (depending on xserver).
-        - locale settings for multibyte characters are respected.
+        - i18n: locale settings for multibyte characters are respected.
         - proportional fonts are supported now.
 	- supports options as long options now.
 	- call redraw() before entering the main loop to ensure that
