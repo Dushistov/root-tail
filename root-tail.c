@@ -317,6 +317,7 @@ InitWindow (void)
 void
 redraw (void)
 {
+  XSetClipMask (disp, WinGC, None);
   XClearArea (disp, root, win_x - 2, win_y - 2, width + 5, height + 5, False);
   refresh (0, 32768);
 }
@@ -331,7 +332,6 @@ refresh (int miny, int maxy)
 
   miny -= win_y + font_height;
   maxy -= win_y - font_height;
-
 
   for (lin = listlen; lin--;)
     {
@@ -654,7 +654,7 @@ static void
 main_loop (void)
 {
   lines = xmalloc (sizeof (struct linematrix) * listlen);
-  int lin, miny, maxy;
+  int lin;
   time_t lastreload;
   Region region = XCreateRegion ();
   XEvent xev;
@@ -662,8 +662,6 @@ main_loop (void)
   struct logfile_entry *current;
   int need_update = 1;
 
-  maxy = 0;
-  miny = win_y + height;
   lastreload = time (NULL);
 
   /* Initialize linematrix */
@@ -770,11 +768,8 @@ main_loop (void)
                 r.y = xev.xexpose.y;
                 r.width = xev.xexpose.width;
                 r.height = xev.xexpose.height;
+
                 XUnionRectWithRegion (&r, region, region);
-                if (miny > r.y)
-                  miny = r.y;
-                if (maxy < r.y + r.height)
-                  maxy = r.y + r.height;
               }
               break;
             default:
@@ -797,13 +792,15 @@ main_loop (void)
 
       if (!XEmptyRegion (region))
         {
-          XSetRegion (disp, WinGC, region);
+          XRectangle r;
 
-          refresh (miny, maxy);
+          XSetRegion (disp, WinGC, region);
+          XClipBox (region, &r);
+
+          refresh (r.y, r.y + r.height);
+
           XDestroyRegion (region);
           region = XCreateRegion ();
-          maxy = 0;
-          miny = 32768;
         }
     }
 }
