@@ -1,4 +1,4 @@
-COPTS = -g -O2
+COPTS = -g
 
 CFLAGS = -Wall $(COPTS)
 

@@ -1094,6 +1094,7 @@ main_loop (void)
               /* if all we just read was a newline ending a line that we've already displayed, skip it */
               if (current->buf[0] == '\0' && current->lastpartial)
                 {
+		  free(current->buf);
                   current->buf = 0;
                   continue;
                 }
