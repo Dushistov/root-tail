@@ -1628,5 +1628,3 @@ daemonize (void)
 
   return 0;
 }
-
-/* todo - get reverse display working again */
