@@ -1,3 +1,9 @@
+1.2  Fri Mar 26 13:19:10 CET 2004
+
+	- call redraw() before entering the main loop to ensure that
+          at least something is displayed on the root window
+          immediately
+
 1.1  Fri Mar 26 03:58:50 CET 2004
 
 	- added options:

@@ -442,9 +442,7 @@ FILE *openlog(struct logfile_entry *file)
     if (opt_noinitial)
       fseek (file->fp, 0, SEEK_END);
     else if (stats.st_size > (listlen + 1) * width)
-      {
-        fseek(file->fp, -((listlen + 2) * width), SEEK_END);
-      }
+      fseek(file->fp, -((listlen + 2) * width), SEEK_END);
 
     file->last_size = stats.st_size;
     return file->fp;
@@ -531,6 +529,12 @@ void main_loop(void)
 	strcpy(lines[lin].line, "~");
 	lines[lin].color = GetColor(def_color);
     }
+
+    /* show the display full of empty lines ("~") in case the first
+     * time around the loop doesn't produce any output, as it won't if
+     * either (a) -noinitial is set or (b) all the files are currently
+     * empty */
+    redraw();
 
     for (;;) {
 	int need_update = 0;
