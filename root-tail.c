@@ -545,15 +545,18 @@ check_open_files (void)
           if (e->fp)
             fclose (e->fp);
           if (openlog (e) == NULL)
-            break;
+            continue;
         }
 
+      /* HACK this - stats can be uninitialised here (if the file
+       * didn't exist when stat() was called, but was recreated during
+       * the sleep(1)) */
       if (stats.st_ino != e->inode)
         {                       /* file renamed? */
           if (e->fp)
             fclose (e->fp);
           if (openlog (e) == NULL)
-            break;
+            continue;
         }
 
       if (stats.st_size < e->last_size)
@@ -729,17 +732,16 @@ main_loop (void)
                * last time we showed it, it wasn't finished, then
                * append to the last line shown */
               if (lastprinted == current && current->lastpartial)
-                {
+		append_line (listlen - 1, current->buf);
+              else if (current->lastpartial)
+		{
+                  split_line (listlen - 1, continuation, current->color);
                   append_line (listlen - 1, current->buf);
-                  free (current->buf), current->buf = 0;
-                  continue;
-                }
+		}
               else
-                {
-                  split_line (listlen - 1, current->buf, current->color);
-                  free (current->buf), current->buf = 0;
-                }
+		split_line (listlen - 1, current->buf, current->color);
 
+	      free (current->buf), current->buf = 0;
               current->index = listlen - 1;
               lastprinted = current;
             }
