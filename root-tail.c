@@ -660,8 +660,8 @@ check_open_files (void)
           sleep (1);
           if (e->fp)
             fclose (e->fp);
-          if (openlog (e) == NULL)
-            continue;
+          openlog (e);
+          continue;
         }
 
       /* HACK-3: stats can be uninitialised here (if the file didn't
