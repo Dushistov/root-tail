@@ -544,6 +544,11 @@ check_open_files (void)
     }
 }
 
+/*
+ * insert a single physical line (that must be short enough to fit)
+ * at position "idx" by pushing up lines above it. the caller
+ * MUST then fill in lines[idx] with valid data.
+ */
 static void
 insert_line (int idx)
 {
@@ -560,6 +565,10 @@ insert_line (int idx)
       current->index--;
 }
 
+/*
+ * remove a single physical line at position "idx" by moving the lines above it
+ * down and inserting a "~" line at the top.
+ */
 static void
 delete_line (int idx)
 {
@@ -576,6 +585,11 @@ delete_line (int idx)
       current->index++;
 }
 
+/*
+ * takes a logical log file line and split it into multiple physical
+ * screen lines by splitting it whenever a part becomes too long.
+ * lal lines will be inserted at position "idx".
+ */
 static void
 split_line (int idx, const char *str, unsigned long color)
 {
@@ -615,6 +629,11 @@ split_line (int idx, const char *str, unsigned long color)
   while (l);
 }
 
+/*
+ * append something to an existing physical line. this is done
+ * by deleting the file on-screen, concatenating the new data to it
+ * and splitting it again.
+ */
 static void
 append_line (int idx, const char *str)
 {
