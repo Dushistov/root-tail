@@ -532,14 +532,14 @@ concat_line (const char *p1, const char *p2)
 }
 
 /*
- * This routine should read a single line, no matter how long.
+ * HACK-1: This routine should read a single line, no matter how long.
  */
 int
 lineinput (struct logfile_entry *logfile)
 {
   char buff[1024], *p = buff;
   int ch;
-  /* HACK this - to add on the length of any partial line which we will be appending to */
+  /* HACK-2: add on the length of any partial line which we will be appending to */
   int ofs = logfile->buf ? strlen (logfile->buf) : 0;
 
   do
@@ -664,9 +664,9 @@ check_open_files (void)
             continue;
         }
 
-      /* HACK this - stats can be uninitialised here (if the file
-       * didn't exist when stat() was called, but was recreated during
-       * the sleep(1)) */
+      /* HACK-3: stats can be uninitialised here (if the file didn't
+       * exist when stat() was called, but was recreated during the
+       * sleep(1)) */
       if (stats.st_ino != e->inode)
         {                       /* file renamed? */
           if (e->fp)
@@ -774,6 +774,8 @@ split_line (int idx, const char *str, unsigned long color)
 	}
 
       {
+	/* HACK-4 - consider inserting the 'continuation string'
+	 * before the rest of the wrapped line */
         char *s = xmalloc (p - beg + 1);
         memcpy (s, beg, p - beg);
         s[p - beg] = 0;
@@ -868,7 +870,7 @@ main_loop (void)
                * different file */
               if (!opt_nofilename && lastprinted != current && current->desc[0])
                 {
-                  char buf[1024]; /* HACK */
+                  char buf[1024]; /* HACK-5 */
                   snprintf (buf, sizeof (buf), "[%s]", current->desc);
                   split_line (listlen - 1, buf, current->color);
                 }
@@ -1119,7 +1121,7 @@ main (int argc, char *argv[])
                 perror (fname), exit (1);
 
               l = strlen (desc);
-	      /* HACK on this - width is in pixels now */
+	      /* HACK-6: width is in pixels now */
               if (l > width - 2)        /* must account for [ ] */
                 l = width - 2;
               e->desc = xmalloc (l + 1);
@@ -1152,7 +1154,7 @@ main (int argc, char *argv[])
       exit (1);
     }
 
-  /* HACK this - do we want to allow both -shade and -outline? */
+  /* HACK-7: do we want to allow both -shade and -outline? */
   if (opt_shade && opt_outline)
     {
       fprintf (stderr, "Specify at most one of -shade and -outline\n");
