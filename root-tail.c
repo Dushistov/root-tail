@@ -798,8 +798,6 @@ split_line (int idx, const char *str, unsigned long color)
 	}
 
       {
-	/* HACK-4 - consider inserting the 'continuation string'
-	 * before the rest of the wrapped line */
 	int len = p - beg + (last_wrapped ? continuation_length : 0);
         char *s = xmalloc (len + 1);
 	if (last_wrapped)
@@ -904,9 +902,9 @@ main_loop (void)
                * different file */
               if (!opt_nofilename && lastprinted != current && current->desc[0])
                 {
-                  char buf[1024]; /* HACK-5 */
-                  snprintf (buf, sizeof (buf), "[%s]", current->desc);
-                  split_line (listlen - 1, buf, current->color);
+                  split_line (listlen - 1, "[", current->color);
+                  append_line (listlen - 1, current->desc);
+                  append_line (listlen - 1, "]");
                 }
 
               /* if we're dealing with partial lines, and the last
