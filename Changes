@@ -2,10 +2,12 @@
         - applied patch by raldi@verisignlabs.com (-noinitial fix).
 
 0.1.1
-	- backported fixed from Marco d'Itri, who did most of the maintaining
+	- backported fixes from Marco d'Itri, who did most of the maintaining
           work over the last year(s). Unfortunately, he doesn't answer my mails
           (just as I did to most of root-tails users ;), so this is also the first
           sourceforge release.
+        - convert tab characters to spaces
+        - fix -noinital bug
 
 0.0.10
 	- initial lines are now displayed in the correct colour
