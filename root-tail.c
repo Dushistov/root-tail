@@ -1328,7 +1328,7 @@ display_help (char *myname)
           "                           values o.k.). Default 2.4 seconds\n"
           " -V                        display version information and exit\n"
           "\n");
-  printf ("Example:\n%s -g 80x25+100+50 -font fixed /var/log/messages,green "
+  printf ("Example:\n%s -g 800x250+100+50 -font fixed /var/log/messages,green "
           "/var/log/secure,red,'ALERT'\n", myname);
   exit (0);
 }
