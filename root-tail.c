@@ -464,7 +464,10 @@ lineinput (struct logfile_entry *logfile)
   free (logfile->buf); logfile->buf = p;
 
   logfile->lastpartial = logfile->partial;
-  logfile->partial = ch == EOF;
+  /* there are 3 ways we could have exited the loop: reading '\n',
+   * reaching EOF, or filling the buffer; the 2nd and 3rd of these
+   * both result in a partial line */
+  logfile->partial = ch != '\n';
   
   if (logfile->partial && opt_whole)
     return 0;
