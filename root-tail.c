@@ -743,7 +743,6 @@ split_line (int idx, const char *str, unsigned long color)
     {
       continuation_length = strlen(continuation);
       continuation_width = XmbTextEscapement (fontset, continuation, continuation_length);
-      printf("continuation width is %d and length is %d\n", continuation_width, continuation_length);
     }
 
   do
