@@ -189,6 +189,28 @@ void InitWindow(void)
     XSelectInput(disp, root, ExposureMask|FocusChangeMask);
 }
 
+char * 
+detabificate (char *s)
+{
+  char * out;
+  int i, j;
+
+  out = malloc (8 * strlen (s) + 1);
+
+  for(i = 0, j = 0; s[i]; i++) 
+    {
+      if (s[i] == '\t') 
+        do 
+          out[j++] = ' ';
+        while (j % 8);      
+      else
+        out[j++] = s[i];
+    }
+  
+  out[j] = '\0';
+  return out;
+}
+
 /*
  * redraw does a complete redraw, rather than an update (i.e. the area
  * gets cleared first)
@@ -209,26 +231,29 @@ void refresh(struct linematrix *lines, int miny, int maxy)
     miny -= win_y + font_height;
     maxy -= win_y - font_height;
 
-    for (lin = listlen; lin--;) {
-	int line;
-
-	offset -= font_height;
-	if (offset < miny || offset > maxy)
-	    continue;
-
-	if (opt_reverse)
-	    line = listlen - lin - 1;
-	else
-	    line = lin;
-
-	if (opt_shade) {
-	    XSetForeground(disp, WinGC, black_color);
-	    XDrawString(disp, root, WinGC, win_x + 2, win_y + offset + 2,
-			lines[line].line, strlen(lines[line].line));
-	}
-	XSetForeground(disp, WinGC, lines[line].color);
-	XDrawString(disp, root, WinGC, win_x, win_y + offset,
-		    lines[line].line, strlen(lines[line].line));
+    for (lin = listlen; lin--;)
+      {
+        char *temp;
+  
+        offset -= font_height;
+  
+        if (offset < miny || offset > maxy)
+          continue;
+  
+        temp = detabificate (lines[lin].line);
+  
+        if (opt_shade)
+          {
+            XSetForeground (disp, WinGC, black_color);
+            XDrawString (disp, root, WinGC, win_x + 2, win_y + offset + 2,
+                         temp, strlen (temp));
+          }
+  
+        XSetForeground (disp, WinGC, lines[lin].color);
+        XDrawString (disp, root, WinGC, win_x, win_y + offset,
+  		   temp, strlen (temp));
+        
+        free (temp);
     }
 
     if (opt_frame) {
@@ -318,14 +343,17 @@ FILE *openlog(struct logfile_entry *file)
     } else
 	file->inode = stats.st_ino;
 
-    if (stats.st_size > (listlen + 1) * width) {
-	char dummy[255];
+    if (opt_noinitial)
+      fseek (file->fp, 0, SEEK_END);
+    else if (stats.st_size > (listlen + 1) * width)
+      {
+        char dummy[255];
 
-	fseek(file->fp, -((listlen + 2) * width), SEEK_END);
-	/* the pointer might point halfway some line. Let's
-	   be nice and skip this damaged line */
-	lineinput(dummy, sizeof(dummy), file->fp);
-    }
+        fseek(file->fp, -((listlen + 2) * width), SEEK_END);
+        /* the pointer might point halfway some line. Let's
+           be nice and skip this damaged line */
+        lineinput(dummy, sizeof(dummy), file->fp);
+      }
 
     file->last_size = stats.st_size;
     return file->fp;
