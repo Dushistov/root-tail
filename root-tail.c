@@ -59,6 +59,7 @@ struct logfile_entry
   int partial;                  /* true if the last line isn't complete        */
   int lastpartial;              /* true if the previous output wasn't complete */
   int index;                    /* index into linematrix of a partial line     */
+  int modified;			/* true if line is modified & needs displaying */
 };
 
 struct linematrix
@@ -68,8 +69,16 @@ struct linematrix
   unsigned long color;
 };
 
+struct displaymatrix
+{
+  char *line;
+  int len;
+  int buffer_size;
+};
+
 /* global variables */
 struct linematrix *lines;
+struct displaymatrix *display;
 int width = STD_WIDTH, height = STD_HEIGHT, listlen;
 int win_x = LOC_X, win_y = LOC_Y;
 int font_ascent, font_height;
@@ -114,8 +123,8 @@ void blank_window (int);
 
 void InitWindow (void);
 unsigned long GetColor (const char *);
-void redraw (void);
-void refresh (int, int, int);
+void redraw (int);
+void refresh (int, int, int, int);
 
 void transform_line (char *s);
 int lineinput (struct logfile_entry *);
@@ -129,6 +138,7 @@ void display_help (char *);
 void install_signal (int, void (*)(int));
 void *xstrdup (const char *);
 void *xmalloc (size_t);
+void *xrealloc (void *, size_t);
 int daemonize (void);
 
 /* signal handlers */
@@ -151,7 +161,7 @@ force_reopen (int dummy)
 void
 force_refresh (int dummy)
 {
-  redraw ();
+  redraw (1);
 }
 
 void
@@ -350,20 +360,23 @@ InitWindow (void)
 }
 
 /*
- * redraw does a complete redraw, rather than an update (i.e. the area
- * gets cleared first)
+ * if redraw() is passwd a non-zero argument, it does a complete
+ * redraw, rather than an update.  if the argument is zero (and
+ * -noflicker is in effect) then only the lines which have changed
+ * since the last draw are redrawn.
+ *
  * the rest is handled by regular refresh()'es
  */
 void
-redraw (void)
+redraw (int redraw_all)
 {
   XSetClipMask (disp, WinGC, None);
-  refresh (0, 32768, 1);
+  refresh (0, 32768, 1, redraw_all);
 }
 
 /* Just redraw everything without clearing (i.e. after an EXPOSE event) */
 void
-refresh (int miny, int maxy, int clear)
+refresh (int miny, int maxy, int clear, int refresh_all)
 {
   int lin;
   int offset = (listlen + 1) * font_height;
@@ -378,42 +391,71 @@ refresh (int miny, int maxy, int clear)
   for (lin = listlen; lin--;)
     {
       struct linematrix *line = lines + (opt_reverse ? listlen - lin - 1 : lin);
+      struct displaymatrix *display_line = display + lin;
 
       offset -= font_height;
 
       if (offset < miny || offset > maxy)
         continue;
 
-      if (clear && opt_noflicker)
-	XClearArea (disp, root, win_x, win_y + offset - font_height,
-		    width + effect_x_space, font_height + effect_y_space, False);
+      if (opt_noflicker)
+	{
+	  /* if this line is a different than it was, then it
+	   * needs displaying */
+	  if (refresh_all ||
+	      display_line->len != line->len ||
+	      strcmp(display_line->line, line->line))
+	    {
+	      /* update the record of what has been displayed;
+	       * first make sure the buffer is big enough */
+	      if (display_line->buffer_size <= line->len)
+		{
+		  display_line->buffer_size = line->len + 1;
+		  display_line->line = xrealloc(display_line->line, display_line->buffer_size);
+		}
+	      strcpy(display_line->line, line->line);
+	      display_line->len = line->len;
 
-      if (opt_outline)
-        {
-	  int x, y;
-          XSetForeground (disp, WinGC, black_color);
+	      if (clear)
+		XClearArea (disp, root, win_x, win_y + offset - font_height,
+			    width + effect_x_space, font_height + effect_y_space, False);
 
-	  for (x = -1; x < 2; x += 2)
-	    for (y = -1; y < 2; y += 2)
+	      if (opt_outline)
+		{
+		  int x, y;
+		  XSetForeground (disp, WinGC, black_color);
+
+		  for (x = -1; x < 2; x += 2)
+		    for (y = -1; y < 2; y += 2)
+		      XmbDrawString (disp, root, fontset, WinGC,
+				     win_x + effect_x_offset + x,
+				     win_y + effect_y_offset + y + offset - font_height + font_ascent,
+				     line->line, line->len);
+		}
+	      else if (opt_shade)
+		{
+		  XSetForeground (disp, WinGC, black_color);
+		  XmbDrawString (disp, root, fontset, WinGC,
+				 win_x + effect_x_offset + SHADE_X,
+				 win_y + effect_y_offset + offset + SHADE_Y - font_height + font_ascent,
+				 line->line, line->len);
+		}
+
+	      XSetForeground (disp, WinGC, line->color);
 	      XmbDrawString (disp, root, fontset, WinGC,
-			     win_x + effect_x_offset + x,
-			     win_y + effect_y_offset + y + offset - font_height + font_ascent,
+			     win_x + effect_x_offset,
+			     win_y + effect_y_offset + offset - font_height + font_ascent,
 			     line->line, line->len);
-        }
-      else if (opt_shade)
-        {
-          XSetForeground (disp, WinGC, black_color);
-          XmbDrawString (disp, root, fontset, WinGC,
-			 win_x + effect_x_offset + SHADE_X,
-                         win_y + effect_y_offset + offset + SHADE_Y - font_height + font_ascent,
+	    }
+	}
+      else
+	{
+	  XSetForeground (disp, WinGC, line->color);
+	  XmbDrawString (disp, root, fontset, WinGC,
+			 win_x + effect_x_offset,
+			 win_y + effect_y_offset + offset - font_height + font_ascent,
 			 line->line, line->len);
-        }
-
-      XSetForeground (disp, WinGC, line->color);
-      XmbDrawString (disp, root, fontset, WinGC,
-		     win_x + effect_x_offset,
-		     win_y + effect_y_offset + offset - font_height + font_ascent,
-                     line->line, line->len);
+	}
     }
 
   if (opt_frame)
@@ -454,7 +496,7 @@ transform_line (char *s)
 	  printf("match is from %d to %d\n",
 		 match_start, match_end);
 	  if (new_len > old_len) {
-	    s = realloc(s, old_whole_len + new_len - old_len);
+	    s = xrealloc(s, old_whole_len + new_len - old_len);
 	  }
 	  if (new_len != old_len) {
 	    memcpy(s + match_end + new_len - old_len,
@@ -675,7 +717,7 @@ delete_line (int idx)
   for (cur_line = idx; cur_line > 0; cur_line--)
     lines[cur_line] = lines[cur_line - 1];
 
-  lines[0].line = strdup ("~");
+  lines[0].line = xstrdup ("~");
 
   for (current = loglist; current; current = current->next)
     if (current->index >= 0 && current->index <= idx)
@@ -773,6 +815,7 @@ static void
 main_loop (void)
 {
   lines = xmalloc (sizeof (struct linematrix) * listlen);
+  display = xmalloc (sizeof (struct displaymatrix) * listlen);
   int lin;
   time_t lastreload;
   Region region = XCreateRegion ();
@@ -786,8 +829,11 @@ main_loop (void)
   /* Initialize linematrix */
   for (lin = 0; lin < listlen; lin++)
     {
-      lines[lin].line = strdup ("~");
+      lines[lin].line = xstrdup ("~");
       lines[lin].len = 1;
+      display[lin].line = xstrdup("");
+      display[lin].len = 0;
+      display[lin].buffer_size = 1;
       lines[lin].color = GetColor (def_color);
     }
 
@@ -848,7 +894,7 @@ main_loop (void)
 
       if (need_update)
         {
-          redraw ();
+          redraw (0);
           need_update = 0;
         }
       else
@@ -915,7 +961,7 @@ main_loop (void)
           XSetRegion (disp, WinGC, region);
           XClipBox (region, &r);
 
-          refresh (r.y, r.y + r.height, 0);
+          refresh (r.y, r.y + r.height, 0, 1);
 
           XDestroyRegion (region);
           region = XCreateRegion ();
@@ -1184,6 +1230,20 @@ xmalloc (size_t size)
   void *p;
 
   while ((p = malloc (size)) == NULL)
+    {
+      fprintf (stderr, "Memory exausted.");
+      sleep (10);
+    }
+
+  return p;
+}
+
+void *
+xrealloc (void *ptr, size_t size)
+{
+  void *p;
+
+  while ((p = realloc (ptr, size)) == NULL)
     {
       fprintf (stderr, "Memory exausted.");
       sleep (10);
