@@ -1,4 +1,4 @@
-.TH ROOTTAIL 1 "2004-03-27" "Version 1.0"
+.TH ROOTTAIL 1 "Nov 13, 2000" "Version 0.0.10"
 .UC 5
 .SH NAME
 root-tail \- print text directly to X11 root window
