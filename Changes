@@ -1,4 +1,4 @@
-1.2
+1.2  Fri Jul 30 21:31:42 CEST 2004
 	- replaced default font by "*" to "ensure" some font is found.
 	- accept hexadecimal window ids, as does everybody else(?).
         - made it compile with ansi-89-based compilers again.
