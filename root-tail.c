@@ -729,6 +729,8 @@ delete_line (int idx)
   int cur_line;
   struct logfile_entry *current;
 
+  free (lines[idx].line);
+
   for (cur_line = idx; cur_line > 0; cur_line--)
     lines[cur_line] = lines[cur_line - 1];
 
@@ -850,10 +852,9 @@ append_line (int idx, const char *str)
   char *old = lines[idx].line;
   char *new = concat_line (old, str);
 
-  free (old);
-
   delete_line (idx);
   split_line (idx, new, color);
+  free (new);
 }
 
 static void
