@@ -52,8 +52,9 @@ fixed\fR or any font using \fB-fn \fR'\fI-*-*-*-*-*-*-*-*-*-*-*-*-*-*\fR' with
 the appropriate fields filled out (see xfontsel).
 .TP
 .B -f \|| \--fork
-Forks to the background and gives the pid of itself (useful if root-tail is
-being called from a script or frontend)
+Forks to the background and writes the PID of the daemon process to
+standard output (useful if root-tail is being called from a script or
+frontend).
 .TP
 .B \--reverse
 Display the files in reverse order, with the newest lines at the top.
@@ -74,10 +75,10 @@ they are updated in their files. Using \fB--update\fR automatically turns on
 \fB--partial\fR.
 .TP
 .BI \--cont " STRING"
-CURRENTLY BROKEN. When partial lines are broken into two lines in the
-display, prefix the 2nd line with STRING. Defaults to "\fI[+]\fR". Specify the
-"\fB--whole\fR" argument to ensure partial lines are never displayed, or specify
-"\fB--update\fR" to attempt to "repair" broken lines in-place.
+When partial lines are broken into two lines in the display, prefix
+the 2nd line with STRING. Defaults to "\fI[+]\fR". Specify the "\fB--whole\fR"
+argument to ensure partial lines are never displayed, or specify "\fB--update\fR"
+to attempt to "repair" broken lines in-place.
 .TP
 .B \--wordwrap
 The default behaviour is to fit as much as possible onto each line of
@@ -93,7 +94,7 @@ default is to never re-display the file(s).
 Add black shading to the font.
 .TP
 .B \--outline
-Add black outline to the font (making redraws quite a bit slower).
+Add a black outline to the font (making redraws quite a bit slower).
 .TP
 .B \--noflicker
 Use slower but flicker-free update.

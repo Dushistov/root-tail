@@ -17,6 +17,8 @@
 	- set default 'reload' value to 0 to prevent reloads.
 	- updated man page.
 	- strict-aliasing fix suggested by mmj.
+	- --fork option really does report the PID now, as the man page claims
+	- improved regexp transform code, but not enough...
 
 0.9  Wed Feb 25 15:25:49 CET 2004
 	- unsigned/fseek bug fix by (mmj@panther.mmj.dk).

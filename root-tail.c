@@ -33,12 +33,13 @@
 #include <locale.h>
 #include <ctype.h>
 #include <stdarg.h>
-#if HAS_REGEX
-#include <regex.h>
-#endif
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
+
+#if HAS_REGEX
+#include <regex.h>
+#endif
 
 /* data structures */
 struct logfile_entry
@@ -95,6 +96,8 @@ struct re_list
   struct re_list *next;
 };
 struct re_list *re_head, *re_tail;
+char *transform_to = NULL;
+regex_t *transformre;
 #endif
 
 
@@ -398,10 +401,35 @@ transform_line (char *s)
       int i;
       regmatch_t matched[16];
 
-      i = regexec (&transformre, string, 16, matched, 0);
+      i = regexec (transformre, s, 16, matched, 0);
       if (i == 0)
         {                       /* matched */
+	  int match_start = matched[0].rm_so;
+	  int match_end = matched[0].rm_eo;
+	  int old_len = match_end - match_start;
+	  int new_len = strlen(transform_to);
+	  int old_whole_len = strlen(s);
+	  printf("regexp was matched by '%s' - replace with '%s'\n", s, transform_to);
+	  printf("match is from %d to %d\n",
+		 match_start, match_end);
+	  if (new_len > old_len) {
+	    s = realloc(s, old_whole_len + new_len - old_len);
+	  }
+	  if (new_len != old_len) {
+	    memcpy(s + match_end + new_len - old_len,
+		   s + match_end,
+		   old_whole_len - match_end);
+	    s[old_whole_len + new_len - old_len] = '\0';
+	  }
+	  memcpy(s + match_start,
+		 transform_to,
+		 new_len);
+	  printf("transformed to '%s'\n", s);
         }
+      else
+	{
+	  printf("regexp was not matched by '%s'\n", s);
+	}
     }
 }
 #endif
@@ -428,6 +456,7 @@ lineinput (struct logfile_entry *logfile)
 {
   char buff[1024], *p = buff;
   int ch;
+  /* HACK this - to add on the length of any partial line which we will be appending to */
   int ofs = logfile->buf ? strlen (logfile->buf) : 0;
 
   do
@@ -896,7 +925,11 @@ main (int argc, char *argv[])
             fontname = argv[++i];
 #if HAS_REGEX
           else if (!strcmp (arg, "-t"))
-            transform = argv[++i];
+	    {
+	      transform = argv[++i];
+	      transform_to = argv[++i];
+	      printf("transform: '%s' to '%s'\n", transform, transform_to);
+	    }
 #endif
           else if (!strcmp (arg, "-fork") || !strcmp (arg, "-f"))
             opt_daemonize = 1;
@@ -1035,15 +1068,20 @@ main (int argc, char *argv[])
     {
       int i;
 
-      transformre = xmalloc (sizeof (transformre));
-      i = regcomp (&transformre, transform, REG_EXTENDED);
+      printf("compiling regexp '%s'\n", transform);
+      transformre = xmalloc (sizeof (regex_t));
+      i = regcomp (transformre, transform, REG_EXTENDED);
       if (i != 0)
         {
           char buf[512];
 
-          regerror (i, &transformre, buf, sizeof (buf));
+          regerror (i, transformre, buf, sizeof (buf));
           fprintf (stderr, "Cannot compile regular expression: %s\n", buf);
         }
+      else
+	{
+	  printf("compiled '%s' OK to %x\n", transform, (int)transformre);
+	}
     }
 #endif
 
@@ -1145,14 +1183,17 @@ display_version (void)
 int
 daemonize (void)
 {
-  switch (fork ())
+  pid_t pid;
+
+  switch (pid = fork ())
     {
     case -1:
       return -1;
     case 0:
       break;
     default:
-      _exit (0);
+      printf("%d\n", pid);
+      exit (0);
     }
 
   if (setsid () == -1)
