@@ -17,6 +17,7 @@ root-tail \- print text directly to X11 root window
 .RB [ \-f \|| \-fork ]
 .RB [ \-noinitial ]
 .RB [ \-frame ]
+.RB [ \-id ID ]
 .RB [ \-i \|| \-interval
 .IR SECONDS ]
 .RB [ \-V ]
@@ -50,6 +51,9 @@ Add shading to font.
 .TP
 .B \-noinitial
 Don't display the end of the file(s) initially.
+.TP
+.BI "\-id" " ID"
+Use the given window id for output instead of the root window.
 .TP
 .BI "\-i \|| \-interval" " SECONDS"
 Use the specified sleeping interval between checks instead of the default 3 seconds. Fractional values are o.k.

@@ -146,10 +146,12 @@ unsigned long GetColor(const char *ColorName)
 
     XGetWindowAttributes(disp, root, &Attributes);
     Color.pixel = 0;
+
     if (!XParseColor(disp, Attributes.colormap, ColorName, &Color))
 	fprintf(stderr, "can't parse %s\n", ColorName);
     else if (!XAllocColor(disp, Attributes.colormap, &Color))
 	fprintf(stderr, "can't allocate %s\n", ColorName);
+
     return Color.pixel;
 }
 
@@ -157,6 +159,9 @@ static Window root_window (Display *display, int screen_number)
 {
   Atom __SWM_VROOT = XInternAtom (display, "__SWM_VROOT", False);
   Window real_root_window = RootWindow (display, screen_number);
+
+  if (root) /* root window set via option */
+    return root;
 
   if (__SWM_VROOT != None)
     {
@@ -227,7 +232,9 @@ void InitWindow(void)
     screen = DefaultScreen(disp);
     ScreenHeight = DisplayHeight(disp, screen);
     ScreenWidth = DisplayWidth(disp, screen);
+
     root = root_window (disp, screen);
+
     gcm = GCBackground;
     gcv.graphics_exposures = True;
     WinGC = XCreateGC(disp, root, gcm, &gcv);
@@ -243,6 +250,7 @@ void InitWindow(void)
 
     w = width * font_width;
     h = listlen * font_height;
+
     if (geom_mask & XNegative)
 	win_x = win_x + ScreenWidth - w;
     if (geom_mask & YNegative)
@@ -634,49 +642,56 @@ int main(int argc, char *argv[])
     InitWindow();
 
     for (i = 1; i < argc; i++) {
-	if (argv[i][0] == '-' && argv[i][1] != '\0' && argv[i][1] != ',') {
-	    if (!strcmp(argv[i], "--?") ||
-		!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h"))
+        const char *arg = argv[i];
+
+	if (arg[0] == '-' && arg[1] != '\0' && arg[1] != ',') {
+            if (arg[1] == '-')
+              arg++;
+
+	    if (!strcmp(arg, "-?") ||
+		!strcmp(arg, "-help") || !strcmp(arg, "-h"))
 		display_help(argv[0]);
-	    else if (!strcmp(argv[i], "-V"))
+	    else if (!strcmp(arg, "-V"))
 		display_version();
-	    else if (!strcmp(argv[i], "-g") || !strcmp(argv[i], "-geometry"))
+	    else if (!strcmp(arg, "-g") || !strcmp(arg, "-geometry"))
 		geom_mask = XParseGeometry(argv[++i],
 			&win_x, &win_y, &width, &listlen);
-	    else if (!strcmp(argv[i], "-display"))
+	    else if (!strcmp(arg, "-display"))
 		dispname = argv[++i];
-	    else if (!strcmp(argv[i], "-font") || !strcmp(argv[i], "-fn"))
+	    else if (!strcmp(arg, "-font") || !strcmp(arg, "-fn"))
 		fontname = argv[++i];
 #if HAS_REGEX
-	    else if (!strcmp(argv[i], "-t"))
+	    else if (!strcmp(arg, "-t"))
 		transform = argv[++i];
 #endif
-	    else if (!strcmp(argv[i], "-fork") || !strcmp(argv[i], "-f"))
+	    else if (!strcmp(arg, "-fork") || !strcmp(arg, "-f"))
 		opt_daemonize = 1;
-	    else if (!strcmp(argv[i], "-reload")) {
+	    else if (!strcmp(arg, "-reload")) {
 		reload = atoi(argv[++i]);
 		command = argv[++i];
 	    }
-	    else if (!strcmp(argv[i], "-shade"))
+	    else if (!strcmp(arg, "-shade"))
 		opt_shade = 1;
-	    else if (!strcmp(argv[i], "-frame"))
+	    else if (!strcmp(arg, "-frame"))
 		opt_frame = 1;
-	    else if (!strcmp(argv[i], "-no-filename"))
+	    else if (!strcmp(arg, "-no-filename"))
 		opt_nofilename = 1;
-	    else if (!strcmp(argv[i], "-reverse"))
+	    else if (!strcmp(arg, "-reverse"))
 		opt_reverse = 1;
-	    else if (!strcmp(argv[i], "-color"))
+	    else if (!strcmp(arg, "-color"))
 		def_color = argv[++i];
-	    else if (!strcmp(argv[i], "-noinitial"))
+	    else if (!strcmp(arg, "-noinitial"))
 		opt_noinitial = 1;
-	    else if (!strcmp(argv[i], "-interval") || !strcmp(argv[i], "-i")) {
+	    else if (!strcmp(arg, "-id"))
+		root = atoi (argv[++i]);
+	    else if (!strcmp(arg, "-interval") || !strcmp(arg, "-i")) {
 		double iv = atof(argv[++i]);
 
 		interval.tv_sec = (int) iv;
 		interval.tv_usec = (iv - interval.tv_sec) * 1e6;
 	    } else {
 		fprintf(stderr, "Unknown option '%s'.\n"
-			"Try --help for more information.\n", argv[i]);
+			"Try --help for more information.\n", arg);
 		exit(1);
 	    }
 	} else {		/* it must be a filename */
@@ -685,8 +700,8 @@ int main(int argc, char *argv[])
 	    char *p;
 
 	    /* this is not foolproof yet (',' in filenames are not allowed) */
-	    fname = desc = argv[i];
-	    if ((p = strchr(argv[i], ','))) {
+	    fname = desc = arg;
+	    if ((p = strchr(arg, ','))) {
 		*p = '\0';
 		fcolor = p + 1;
 
@@ -697,7 +712,7 @@ int main(int argc, char *argv[])
 	    }
 
 	    e = xmalloc(sizeof(struct logfile_entry));
-	    if (argv[i][0] == '-' && argv[i][1] == '\0') {
+	    if (arg[0] == '-' && arg[1] == '\0') {
 		if ((e->fp = fdopen(0, "r")) == NULL)
 		    perror("fdopen"), exit(1);
 		if (fcntl(0, F_SETFL, O_NONBLOCK) < 0)
@@ -810,6 +825,7 @@ void display_help(char *myname)
 	    " -color    color           use color $color as default\n"
 	    " -reload sec command       reload after $sec and run command\n"
 	    "                           by default -- 3 mins\n"
+	    " -id id                    window id to use instead of the root window\n"
 	    " -font FONTSPEC            (-fn) font to use\n"
 	    " -f | -fork                fork into background\n"
 	    " -reverse                  print new lines at the top\n"

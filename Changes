@@ -1,5 +1,6 @@
 1.0
 
+	- supports options as long options now.
 	- strict-aliasing fix suggested by mmj.
 
 0.9  Wed Feb 25 15:25:49 CET 2004
