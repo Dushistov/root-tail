@@ -451,7 +451,6 @@ lineinput (struct logfile_entry *logfile)
 #if HAS_REGEX
   transform_line (logfile->buf);
 #endif
-  printf ("got buf <%s>\n", logfile->buf);
   return 1;
 }
 
@@ -673,56 +672,42 @@ main_loop (void)
 
           while (lineinput (current))
             {
-             printf ("lineinput %s\n", current->buf);//D
               need_update = 1;
               /* if we're trying to update old partial lines in
                * place, and the last time this file was updated the
                * output was partial, and that partial line is not
                * too close to the top of the screen, then update
                * that partial line */
-              printf ("BPa\n");//D
-              if (opt_update && current->lastpartial && current->index >= 3)
+              if (opt_update && current->lastpartial && current->index > 0)
                 {
                   append_line (current->index, current->buf);
-
-                  if (!current->partial)
-                    {
-                      free (current->buf);
-                      current->buf = 0;
-                    }
-
+                  free (current->buf), current->buf = 0;
                   continue;
                 }
 
-              printf ("BPb\n");//D
               /* print filename if any, and if last line was from
                * different file */
-              if (!opt_nofilename &&
-                  lastprinted != current && current->desc[0])
+              if (!opt_nofilename && lastprinted != current && current->desc[0])
                 {
                   char buf[1024]; /* HACK */
                   snprintf (buf, sizeof (buf), "[%s]", current->desc);
-              printf ("BPc<%s>\n", buf);//D
                   split_line (listlen - 1, buf, current->color);
                 }
 
-              printf ("BP1\n");//D
               /* if this is the same file we showed last, and the
                * last time we showed it, it wasn't finished, then
                * append to the last line shown */
               if (lastprinted == current && current->lastpartial)
                 {
                   append_line (listlen - 1, current->buf);
-                  free (current->buf);
-                  current->buf = 0;
+                  free (current->buf), current->buf = 0;
                   continue;
                 }
               else
                 {
                   split_line (listlen - 1, current->buf, current->color);
-                  free (current->buf); current->buf = 0;
+                  free (current->buf), current->buf = 0;
                 }
-              printf ("BP3\n");//D
 
               current->index = listlen - 1;
               lastprinted = current;
