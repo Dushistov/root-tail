@@ -1158,13 +1158,16 @@ main_loop (void)
 
               /* print filename if any, and if last line was from
                * different file */
-              if (!opt_nofilename && lastprinted != current && current->desc[0])
-                {
+              if (lastprinted != current)
+		{
                   current->last = 0;
-                  insert_new_line (xstrdup ("["), current);
-                  append_to_existing_line (xstrdup (current->desc), current);
-                  append_to_existing_line (xstrdup ("]"), current);
-                }
+		  if (!opt_nofilename && current->desc[0])
+		    {
+		      insert_new_line (xstrdup ("["), current);
+		      append_to_existing_line (xstrdup (current->desc), current);
+		      append_to_existing_line (xstrdup ("]"), current);
+		    }
+		}
 
               /* if we're dealing with partial lines, and the last
                * time we showed the line it wasn't finished ... */
