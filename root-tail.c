@@ -1406,7 +1406,10 @@ main (int argc, char *argv[])
 
               e->fname = NULL;
               e->inode = 0;
-              e->desc = xstrdup ("stdin");
+	      if (desc == arg)
+		e->desc = xstrdup ("stdin");
+	      else
+		e->desc = xstrdup (desc);
             }
           else
             {
