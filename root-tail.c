@@ -1357,7 +1357,12 @@ main (int argc, char *argv[])
           else if (!strcmp (arg, "-noinitial"))
             opt_noinitial = 1;
           else if (!strcmp (arg, "-id"))
-            root = atoi (argv[++i]);
+            {
+              unsigned long id;
+
+              if (sscanf (argv[++i], "%li", &id) == 1 && id)
+                root = id;
+            }
           else if (!strcmp (arg, "-interval") || !strcmp (arg, "-i"))
             {
               double iv = atof (argv[++i]);
