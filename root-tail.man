@@ -4,29 +4,29 @@
 root-tail \- print text directly to X11 root window
 .SH SYNOPSIS
 .B root-tail
-.RB [ \-g \|| -geometry
+.RB [ \-g \|| --geometry
 .IR GEOMETRY ]
-.RB [ \-fn \|| -font
+.RB [ \-fn \|| --font
 .IR FONTSPEC ]
-.RB [ \-color
+.RB [ \--color
 .IR color ]
-.RB [ \-reload
+.RB [ \--reload
 .IR SEC
 .IR COMMAND ]
-.RB [ \-shade ]
-.RB [ \-outline ]
-.RB [ \-noflicker ]
-.RB [ \-f \|| \-fork ]
-.RB [ \-reverse ]
-.RB [ \-whole ]
-.RB [ \-partial ]
-.RB [ \-update ]
-.RB [ \-cont
+.RB [ \--shade ]
+.RB [ \--outline ]
+.RB [ \--noflicker ]
+.RB [ \-f \|| \--fork ]
+.RB [ \--reverse ]
+.RB [ \--whole ]
+.RB [ \--partial ]
+.RB [ \--update ]
+.RB [ \--cont
 .IR STRING ]
-.RB [ \-noinitial ]
-.RB [ \-frame ]
+.RB [ \--noinitial ]
+.RB [ \--frame ]
 .RB [ \-id ID ]
-.RB [ \-i \|| \-interval
+.RB [ \-i \|| \--interval
 .IR SECONDS ]
 .RB [ \-V ]
 file1[,color[,desc]]
@@ -36,74 +36,74 @@ file1[,color[,desc]]
 Displays a given file anywhere on your X11 root window with a transparent
 background. It was made because I'm very lazy and this was easier than
 making a new rxvt pixmap each time I changed my background to simulate
-that transparent effect.  A null desc (example: "/var/log/messages,red,")
+that transparent effect. A null desc (example: "/var/log/messages,red,")
 will prevent the printing of a description and the []'s.
 .PP
 .SS General Options
 .TP
-.BI \-color " COLOR"
+.BI \--color " COLOR"
 Use color $color as default.
 .TP
-.BI "\-font \|| -fn" " FONTSPEC"
-Use font FONTSPEC.  This can be either fixed withn fonts like -fn
+.BI "\--font \|| -fn" " FONTSPEC"
+Use font FONTSPEC. This can be either fixed withn fonts like -fn
 fixed or any font using -fn '-*-*-*-*-*-*-*-*-*-*-*-*-*-*' with the
-appropriate fields filled out (see xfontsel)
+appropriate fields filled out (see xfontsel).
 .TP
-.B -f \|| \-fork
+.B -f \|| \--fork
 Forks to the background and gives the pid of itself (useful if rt is
 being called from a script or frontend)
 .TP
-.B \-reverse
+.B \--reverse
 Display the files in reverse order, with the newest lines at the top.
 .TP
-.B \-whole
-Only display whole lines.  If the last line of a file doesn't yet end
+.B \--whole
+Only display whole lines. If the last line of a file doesn't yet end
 with a newline character then wait until it does before displaying
-it.  This is the default if more than one file is being displayed.
+it. This is the default if more than one file is being displayed.
 .TP
-.B \-partial
-This is the opposite of the -whole option (see above).  It displays
-lines even if they don't yet have a newline at the end.  This is the
+.B \--partial
+This is the opposite of the --whole option (see above). It displays
+lines even if they don't yet have a newline at the end. This is the
 default if only one file is being displayed.
 .TP
-.B \-update
+.B \--update
 Update partial lines 'in place' if they are still on the screen when
-they are updated in their files.  Using -update automatically turns on
--partial.
+they are updated in their files. Using --update automatically turns on
+--partial.
 .TP
-.BI \-cont " STRING"
-When partial lines are broken into two lines in the display, prefix
-the 2nd line with STRING.  Defaults to "[+]".  Specify the "-whole"
-argument to ensure partial lines are never displated, or
-specify "-update" to attempt to "repair" broken lines in-place.
+.BI \--cont " STRING"
+CURRENTLY BROKEN. When partial lines are broken into two lines in the
+display, prefix the 2nd line with STRING. Defaults to "[+]". Specify the
+"--whole" argument to ensure partial lines are never displayed, or specify
+"--update" to attempt to "repair" broken lines in-place.
 .TP
-.BI \-reload " SEC COMMAND"
-Re-display the file(s) and run COMMAND every SEC seconds.  The
+.BI \--reload " SEC COMMAND"
+Re-display the file(s) and run COMMAND every SEC seconds. The
 default is to never re-display the file(s).
 .TP
-.B \-shade
+.B \--shade
 Add black shading to the font.
 .TP
-.B \-outline
-Add black outline to the font.
+.B \--outline
+Add black outline to the font (making redraws quite a bit slower).
 .TP
-.B \-noflicker
+.B \--noflicker
 Use slower but flicker-free update.
 .TP
-.B \-noinitial
+.B \--noinitial
 Don't display the end of the file(s) initially.
 .TP
 .BI "\-id" " ID"
 Use the given window ID for output instead of the root window.
 .TP
-.BI "\-i \|| \-interval" " SECONDS"
+.BI "\-i \|| \--interval" " SECONDS"
 Use the specified sleeping interval between checks instead of the
 default 2.4 seconds. Fractional values are OK.
 .TP
 .B \-V
 Print version information.
 .TP
-.B \-frame
+.B \--frame
 Surround the selected area with a frame. This is just a debugging tool
 and doesn't always work properly. Use it to find the perfect geometry.
 .IP
