@@ -3,7 +3,7 @@
  * Copyright 2000,2001,2002,2003,2004
  *           Marc Lehmann <pcg@goof.com>,
  *           and many others, see README
- *  
+ *
  * Original version by Mike Baker.
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -48,6 +48,9 @@
 #define SHADE_X 2
 #define SHADE_Y 2
 
+/* some italic fonts still go over the margin - this margin of error cleans up the mess */
+#define MARGIN_OF_ERROR 2
+
 /* data structures */
 struct logfile_entry
 {
@@ -56,6 +59,10 @@ struct logfile_entry
   char *fname;                  /* name of file                                 */
   char *desc;                   /* alternative description                      */
   char *buf;                    /* text read but not yet displayed              */
+  const char *fontname;
+  XFontSet fontset;
+  int font_height;
+  int font_ascent;
   FILE *fp;                     /* FILE struct associated with file             */
   ino_t inode;                  /* inode of the file opened                     */
   off_t last_size;              /* file size at the last check                  */
@@ -92,27 +99,26 @@ struct displaymatrix
 {
   char *line;
   int len;
+  int offset;
   int buffer_size;
   unsigned long color;
 };
 
 /* global variables */
-int debug = 1;
-
 struct line_node *linelist = NULL, *linelist_tail = NULL;
 struct displaymatrix *display;
 int continuation_width = -1;
 int continuation_color;
 int continuation_length;
 
-int width = STD_WIDTH, height = STD_HEIGHT, listlen;
+/* HACK - ideally listlen will start at however many '~'s will fit on
+ * the screen */
+int width = STD_WIDTH, height = STD_HEIGHT, listlen = 50;
 int win_x = LOC_X, win_y = LOC_Y;
-int font_ascent, font_height;
 int effect_x_space, effect_y_space; /* how much space does shading / outlining take up */
 int effect_x_offset, effect_y_offset; /* and how does it offset the usable space */
 int do_reopen;
 struct timeval interval = { 2, 400000 };
-XFontSet fontset;
 
 /* command line options */
 int opt_noinitial, opt_shade, opt_frame, opt_reverse, opt_nofilename,
@@ -193,7 +199,7 @@ force_refresh (int dummy)
 void
 blank_window (int dummy)
 {
-  XClearArea (disp, root, win_x - 2, win_y - 2, width + 5, height + 5, False);
+  XClearArea (disp, root, win_x, win_y, width + MARGIN_OF_ERROR, height, False);
   XFlush (disp);
   exit (0);
 }
@@ -285,6 +291,7 @@ InitWindow (void)
   XGCValues gcv;
   unsigned long gcm;
   int screen, ScreenWidth, ScreenHeight;
+  struct logfile_entry *e;
 
   if (!(disp = XOpenDisplay (dispname)))
     {
@@ -304,36 +311,37 @@ InitWindow (void)
   XMapWindow (disp, root);
   XSetForeground (disp, WinGC, GetColor (DEF_COLOR));
 
-  {
-    char **missing_charset_list;
-    int missing_charset_count;
-    char *def_string;
-
-    fontset = XCreateFontSet (disp, fontname,
-                              &missing_charset_list, &missing_charset_count,
-                              &def_string);
-
-    if (missing_charset_count)
-      {
-        fprintf (stderr,
-                 "Missing charsets in String to FontSet conversion (%s)\n",
-                 missing_charset_list[0]);
-        XFreeStringList (missing_charset_list);
-      }
-  }
-
-  if (!fontset)
+  for (e = loglist; e; e = e->next)
     {
-      fprintf (stderr, "unable to create fontset, exiting.\n");
-      exit (1);
+      char **missing_charset_list;
+      int missing_charset_count;
+      char *def_string;
+
+      e->fontset = XCreateFontSet (disp, e->fontname,
+                                   &missing_charset_list, &missing_charset_count,
+                                   &def_string);
+
+      if (missing_charset_count)
+        {
+          fprintf (stderr,
+                   "Missing charsets in String to FontSet conversion (%s)\n",
+                   missing_charset_list[0]);
+          XFreeStringList (missing_charset_list);
+        }
+
+      if (!e->fontset)
+        {
+          fprintf (stderr, "unable to create fontset for font '%s', exiting.\n", e->fontname);
+          exit (1);
+        }
+
+      {
+        XFontSetExtents *xfe = XExtentsOfFontSet (e->fontset);
+
+        e->font_height = xfe->max_logical_extent.height;
+        e->font_ascent = -xfe->max_logical_extent.y;
+      }
     }
-
-  {
-    XFontSetExtents *xfe = XExtentsOfFontSet (fontset);
-
-    font_height = xfe->max_logical_extent.height;
-    font_ascent = -xfe->max_logical_extent.y;
-  }
 
   if (geom_mask & XNegative)
     win_x = win_x + ScreenWidth - width;
@@ -353,6 +361,7 @@ InitWindow (void)
       /* adding a shadow increases the space used */
       effect_x_space = abs (SHADE_X);
       effect_y_space = abs (SHADE_Y);
+
       /* if the shadow is to the right and below then we don't need
        * to move the text to make space for it, but shadows to the left
        * and above need accomodating */
@@ -363,17 +372,6 @@ InitWindow (void)
     {
       effect_x_space = effect_y_space = 0;
       effect_x_offset = effect_y_offset = 0;
-    }
-
-  /* if we are using -shade or -outline, there will be less usable
-   * space for output */
-  listlen = (height - effect_y_space) / font_height;
-
-  if (!listlen)
-    {
-      fprintf (stderr, "height too small for a single line, setting to %d\n",
-               font_height);
-      listlen = 1;
     }
 
   XSelectInput (disp, root, ExposureMask | FocusChangeMask);
@@ -394,13 +392,13 @@ redraw (int redraw_all)
   refresh (0, 32768, 1, redraw_all);
 }
 
-void draw_text (Display *disp, Window root, XFontSet fontset, GC WinGC, int x, int y, struct line_node *line, int foreground)
+void draw_text (Display *disp, Window root, GC WinGC, int x, int y, struct line_node *line, int foreground)
 {
   if (line->wrapped_right && opt_justify && line->breaks)
     {
       int i;
       for (i = 0; i < line->num_words; i++) {
-        XmbDrawString (disp, root, fontset, WinGC,
+        XmbDrawString (disp, root, line->logfile->fontset, WinGC,
                        x + line->breaks[i].width + ((i * line->free_pixels) / (line->num_words - 1)) + continuation_width * line->wrapped_left, y,
                        line->line + line->breaks[i].index,
                        line->breaks[i].len);
@@ -408,16 +406,16 @@ void draw_text (Display *disp, Window root, XFontSet fontset, GC WinGC, int x, i
       if (line->wrapped_left)
         {
           if (foreground) XSetForeground (disp, WinGC, continuation_color);
-          XmbDrawString (disp, root, fontset, WinGC, x, y, continuation, continuation_length);
+          XmbDrawString (disp, root, line->logfile->fontset, WinGC, x, y, continuation, continuation_length);
         }
     }
   else
     {
-      XmbDrawString (disp, root, fontset, WinGC, x + continuation_width * line->wrapped_left, y, line->line, line->len);
+      XmbDrawString (disp, root, line->logfile->fontset, WinGC, x + continuation_width * line->wrapped_left, y, line->line, line->len);
       if (line->wrapped_left)
         {
           if (foreground) XSetForeground (disp, WinGC, continuation_color);
-          XmbDrawString (disp, root, fontset, WinGC, x, y, continuation, continuation_length);
+          XmbDrawString (disp, root, line->logfile->fontset, WinGC, x, y, continuation, continuation_length);
         }
     }
 }
@@ -427,6 +425,7 @@ void
 refresh (int miny, int maxy, int clear, int refresh_all)
 {
   int lin = 0;
+  int space = height;
   int offset;
   unsigned long black_color = GetColor ("black");
   struct line_node *line;
@@ -434,83 +433,138 @@ refresh (int miny, int maxy, int clear, int refresh_all)
   int foreground = 0;
 
   if (opt_reverse)
-    {
-      step_per_line = font_height;
-      offset = font_ascent + effect_y_offset;
-    }
+    offset = effect_y_offset;
   else
-    {
-      step_per_line = -font_height;
-      offset = (listlen - 1) * font_height + font_ascent + effect_y_offset;
-    }
+    offset = height + effect_y_offset;
 
-  miny -= win_y + font_height;
-  maxy -= win_y - font_height;
+  miny -= win_y;
+  maxy -= win_y;
 
   if (clear && !opt_noflicker)
-    XClearArea (disp, root, win_x, win_y, width, height, False);
+    XClearArea (disp, root, win_x, win_y, width + MARGIN_OF_ERROR, height, False);
 
-  for (line = linelist; line && lin < listlen; line = line->next, lin++, offset += step_per_line)
+  for (line = linelist; line; line = line->next, lin++)
     {
-      struct displaymatrix *display_line = display + lin;
+      struct displaymatrix *display_line;
 
-      if (offset < miny || offset > maxy)
-        continue;
-
-      /* if this line is a different than it was, then it
-       * needs displaying */
-      if (!opt_noflicker
-          || refresh_all
-          || display_line->len != line->len
-          || display_line->color != line->logfile->color
-          || memcmp (display_line->line, line->line, line->len))
+      if (opt_noflicker && lin >= listlen)
         {
-          /* don't bother updating the record of what has been
-           * displayed if -noflicker isn't in effect, since we redraw
-           * the whole display every time anyway */
-          if (opt_noflicker)
+          int i = listlen;
+          listlen *= 1.5;
+          display = xrealloc(display, listlen * sizeof(struct displaymatrix));
+          for (; i < listlen; i++)
             {
-              /* update the record of what has been displayed;
-               * first make sure the buffer is big enough */
-              if (display_line->buffer_size < line->len)
+              display[i].line = xstrdup ("");
+              display[i].len = 0;
+              display[i].offset = 0;
+              display[i].buffer_size = 0;
+            }
+        }
+
+      display_line = display + lin;
+
+      step_per_line = line->logfile->font_height + effect_y_space;
+      if (step_per_line > space)
+        break;
+
+      if (!opt_reverse)
+        offset -= step_per_line;
+
+      offset += line->logfile->font_ascent;
+
+      miny -= line->logfile->font_height;
+      maxy += line->logfile->font_height;
+
+      if (offset >= miny && offset <= maxy)
+        {
+          /* if this line is a different than it was, then it
+           * needs displaying */
+          if (!opt_noflicker
+              || refresh_all
+              || display_line->len != line->len
+              || display_line->color != line->logfile->color
+              || display_line->offset != offset
+              || memcmp (display_line->line, line->line, line->len))
+            {
+              /* don't bother updating the record of what has been
+               * displayed if -noflicker isn't in effect, since we redraw
+               * the whole display every time anyway */
+              if (opt_noflicker)
                 {
-                  display_line->buffer_size = line->len;
-                  display_line->line = xrealloc (display_line->line, display_line->buffer_size);
+                  /* update the record of what has been displayed;
+                   * first make sure the buffer is big enough */
+                  if (display_line->buffer_size < line->len)
+                    {
+                      display_line->buffer_size = line->len;
+                      display_line->line = xrealloc (display_line->line, display_line->buffer_size);
+                    }
+
+                  display_line->len = line->len;
+                  display_line->color = line->logfile->color;
+                  display_line->offset = offset;
+                  memcpy (display_line->line, line->line, line->len);
+
+                  if (clear)
+                    {
+#ifdef DEBUG
+                      static int toggle;
+                      toggle = 1 - toggle;
+                      XSetForeground (disp, WinGC, toggle ? GetColor ("cyan") : GetColor ("yellow"));
+                      XFillRectangle (disp, root, WinGC, win_x, win_y + offset - line->logfile->font_ascent,
+                                      width, step_per_line);
+#else /* DEBUG */
+                      XClearArea (disp, root, win_x, win_y + offset - line->logfile->font_ascent,
+                                  width + MARGIN_OF_ERROR, step_per_line, False);
+#endif /* DEBUG */
+                    }
                 }
 
-              display_line->len = line->len;
-              display_line->color = line->logfile->color;
-              memcpy (display_line->line, line->line, line->len);
+              if (opt_outline)
+                {
+                  int x, y;
+                  XSetForeground (disp, WinGC, black_color);
 
-              if (clear)
-                XClearArea (disp, root, win_x, win_y + offset - font_ascent,
-                            width + effect_x_space, font_height + effect_y_space, False);
+                  for (x = -1; x <= 1; x += 2)
+                    for (y = -1; y <= 1; y += 2)
+                      draw_text (disp, root, WinGC,
+                                 win_x + effect_x_offset + x,
+                                 win_y + y + offset, line, foreground = 0);
+                }
+              else if (opt_shade)
+                {
+                  XSetForeground (disp, WinGC, black_color);
+                  draw_text (disp, root, WinGC,
+                             win_x + effect_x_offset + SHADE_X,
+                             win_y + offset + SHADE_Y, line, foreground = 0);
+                }
+
+              XSetForeground (disp, WinGC, line->logfile->color);
+              draw_text (disp, root, WinGC,
+                         win_x + effect_x_offset,
+                         win_y + offset, line, foreground = 1);
             }
-
-          if (opt_outline)
-            {
-              int x, y;
-              XSetForeground (disp, WinGC, black_color);
-
-              for (x = -1; x <= 1; x += 2)
-                for (y = -1; y <= 1; y += 2)
-                  draw_text (disp, root, fontset, WinGC,
-                             win_x + effect_x_offset + x,
-                             win_y + y + offset, line, foreground = 0);
-            }
-          else if (opt_shade)
-            {
-              XSetForeground (disp, WinGC, black_color);
-              draw_text (disp, root, fontset, WinGC,
-                         win_x + effect_x_offset + SHADE_X,
-                         win_y + offset + SHADE_Y, line, foreground = 0);
-            }
-
-          XSetForeground (disp, WinGC, line->logfile->color);
-          draw_text (disp, root, fontset, WinGC,
-                     win_x + effect_x_offset,
-                     win_y + offset, line, foreground = 1);
         }
+
+      if (opt_reverse)
+        offset += step_per_line;
+      offset -= line->logfile->font_ascent;
+
+      miny += line->logfile->font_height;
+      maxy -= line->logfile->font_height;
+
+      space -= step_per_line;
+    }
+
+  if (space > 0 && clear)
+    {
+#ifdef DEBUG
+      XSetForeground (disp, WinGC, GetColor ("orange"));
+      XFillRectangle (disp, root, WinGC, win_x, win_y + offset - (opt_reverse ? 0 : space),
+                      width, space);
+#else /* DEBUG */
+      XClearArea (disp, root, win_x, win_y + offset - (opt_reverse ? 0 : space),
+                  width + MARGIN_OF_ERROR, space, False);
+#endif
     }
 
   /* any lines that didn't just get looked at are never going to be, so break the chain */
@@ -531,6 +585,9 @@ refresh (int miny, int maxy, int clear, int refresh_all)
   if (opt_frame)
     {
       XSetForeground (disp, WinGC, GetColor (def_color));
+      /* note that XDrawRectangle() draws a rectangle one pixel bigger
+       * in both dimensions than you ask for, hence the subtractions.
+       * XFillRectangle() doesn't suffer from this problem */
       XDrawRectangle (disp, root, WinGC, win_x - 0, win_y - 0, width - 1, height - 1);
     }
 }
@@ -567,7 +624,7 @@ transform_line (char *s)
           printf ("match is from %d to %d\n", match_start, match_end);
           if (new_len > old_len)
             s = xrealloc (s, old_whole_len + new_len - old_len);
-          
+
           if (new_len != old_len)
             {
               memcpy (s + match_end + new_len - old_len,
@@ -668,7 +725,7 @@ lineinput (struct logfile_entry *logfile)
    * reaching EOF, or filling the buffer; the 2nd and 3rd of these
    * both result in a partial line */
   logfile->partial = ch != '\n';
-  
+
   if (logfile->partial && opt_whole)
     return 0;
 
@@ -706,9 +763,10 @@ openlog (struct logfile_entry * file)
 
   if (opt_noinitial)
     fseek (file->fp, 0, SEEK_END);
-  else if (stats.st_size > (listlen + 1) * width)
-    /* HACK - 'width' is in pixels - how are we to know how much text will fit? */
-    fseek (file->fp, -((listlen + 2) * width/10), SEEK_END);
+  else /* if (stats.st_size > (listlen + 1) * width)
+        * HACK - 'width' is in pixels - how are we to know how much text will fit?
+        * fseek (file->fp, -((listlen + 2) * width/10), SEEK_END); */
+    fseek (file->fp, -5000, SEEK_END);
 
   file->last_size = stats.st_size;
   return file->fp;
@@ -843,7 +901,7 @@ possibly_split_long_line (struct logfile_entry *log)
   if (continuation_width == -1)
     {
       continuation_length = strlen (continuation);
-      continuation_width = XmbTextEscapement (fontset, continuation, continuation_length);
+      continuation_width = XmbTextEscapement (log->fontset, continuation, continuation_length);
       continuation_color = GetColor (cont_color);
 
       /* make an array to store information about the location of
@@ -878,8 +936,7 @@ possibly_split_long_line (struct logfile_entry *log)
             len = 1; /* ignore (don't skip) illegal character sequences */
 
           /* find the width in pixels of the next character */
-          cw = XmbTextEscapement (fontset, p, len);
-
+          cw = XmbTextEscapement (log->fontset, p, len);
           if (opt_wordwrap && len == 1 && p[0] == ' ' && p != break_p + 1)
             {
               break_p = p;
@@ -930,7 +987,7 @@ possibly_split_long_line (struct logfile_entry *log)
        * the first character on the line, then wrap at the space */
       if (!wrapped)
         break;
-      
+
       int prefix_len;
 
       /* choose where to break the line */
@@ -956,7 +1013,7 @@ possibly_split_long_line (struct logfile_entry *log)
         }
       else
         prefix_len = p - beg;
-        
+
       /* make a copy of the tail end of the string */
       p = xstrdup (p);
 
@@ -971,16 +1028,16 @@ possibly_split_long_line (struct logfile_entry *log)
       /* 'spaces' includes any space we broke on; we can only justify
        * if there's at least one other space */
       if (opt_justify && spaces &&
-          width - effect_x_space - width_at_break_p < spaces * font_height)
+          width - effect_x_space - width_at_break_p < spaces * log->font_height)
         {
           int i;
-          log->last->free_pixels = width - w;
+          log->last->free_pixels = width - effect_x_space - w;
           log->last->num_words = spaces + 1;
           log->last->breaks = malloc (log->last->num_words * sizeof (struct breakinfo));
           for (i = 0; i < log->last->num_words; i++)
             log->last->breaks[i] = breaks[i];
         }
-        
+
       line = new_line_node (log);
       line->line = p;
       l = line->len = strlen (p);
@@ -1022,7 +1079,7 @@ append_to_existing_line (char *str, struct logfile_entry *log)
   free (str);
   log->last->line = new;
   log->last->len = strlen (new);
-  possibly_split_long_line (log); 
+  possibly_split_long_line (log);
 }
 
 static void
@@ -1061,6 +1118,7 @@ main_loop (void)
 
       display[lin].line = xstrdup ("");
       display[lin].len = 0;
+      display[lin].offset = 0;
       display[lin].buffer_size = 0;
     }
 
@@ -1084,9 +1142,7 @@ main_loop (void)
                * that partial line */
               if (opt_update && current->lastpartial && current->last)
                 {
-                  // int idx = current->index;
                   append_to_existing_line (current->buf, current);
-                  // current->index = idx;
                   current->buf = 0;
                   continue;
                 }
@@ -1094,7 +1150,7 @@ main_loop (void)
               /* if all we just read was a newline ending a line that we've already displayed, skip it */
               if (current->buf[0] == '\0' && current->lastpartial)
                 {
-		  free(current->buf);
+                  free(current->buf);
                   current->buf = 0;
                   continue;
                 }
@@ -1131,7 +1187,6 @@ main_loop (void)
                 insert_new_line (current->buf, current);
 
               current->buf = 0;
-              // current->index = listlen - 1;
               lastprinted = current;
             }
         }
@@ -1338,7 +1393,6 @@ main (int argc, char *argv[])
           e = xmalloc (sizeof (struct logfile_entry));
           e->partial = 0;
           e->buf = 0;
-          // e->index = -1;
 
           if (arg[0] == '-' && arg[1] == '\0')
             {
@@ -1363,6 +1417,7 @@ main (int argc, char *argv[])
 
           e->color = GetColor (fcolor);
           e->partial = 0;
+          e->fontname = fontname;
           e->last = NULL;
           e->next = NULL;
 
@@ -1506,8 +1561,8 @@ xrealloc (void *ptr, size_t size)
 void
 display_help (char *myname)
 {
-  printf ("Usage: %s [options] file1[,color[,desc]] "
-          "[file2[,color[,desc]] ...]\n", myname);
+  printf ("Usage: %s [options] file1[,color[,desc]]"
+          "[options] [file2[,color[,desc]] ...]\n", myname);
   printf (" -g | -geometry geometry   -g WIDTHxHEIGHT+X+Y\n"
           " -color    color           use color $color as default\n"
           " -reload sec command       reload after $sec and run command\n"

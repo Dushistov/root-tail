@@ -8,6 +8,8 @@
 	  structure is now a linked list rather than an array.  the
 	  continuation marker is added at display time, rather than
 	  being in the strings of the datastructure.
+	- it is now possible to specify a different font for each
+	  logfile; use the -fn option between filenames.
 
 1.0   Fri Apr  2 03:37:56 CEST 2004
 	- fix a bug regarding long (>1023 bytes) lines.

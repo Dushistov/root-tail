@@ -50,7 +50,9 @@ Use COLOR as default.
 .BI "\--font \|| -fn" " FONTSPEC"
 Use font FONTSPEC. This can be either a fixed width font like \fB-fn\fI
 fixed\fR or any font using \fB-fn \fR'\fI-*-*-*-*-*-*-*-*-*-*-*-*-*-*\fR' with
-the appropriate fields filled out (see xfontsel).
+the appropriate fields filled out (see xfontsel).  Specifying a
+different FONTSPEC before each filename will cause each file to be
+displayed in a different font.
 .TP
 .B -f \|| \--fork
 Forks to the background.
@@ -125,10 +127,8 @@ and doesn't always work properly. Use it to find the perfect geometry.
 .IP
 .SH EXAMPLE
 .PP
-root-tail -g 800x250+100+50 /var/log/messages,green /var/log/secure,red,'ALERT'
+root-tail -g 800x250+100+50 -font 10x20 /var/log/messages,green -font 12x24 /var/log/secure,red,'ALERT'
 .SH BUGS
-.PP
-\- width must be larger than the longest file-header, otherwise segfaults.
 .PP
 Should you happen to find any bugs please fix them and send me a diff.
 .PP
