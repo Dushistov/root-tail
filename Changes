@@ -19,6 +19,12 @@
 	- strict-aliasing fix suggested by mmj.
 	- --fork option really does report the PID now, as the man page claims
 	- improved regexp transform code, but not enough...
+	- --frame now draws the frame in exactly the right place, just
+	  inside the window (previously a geometry of 1024x768+0+0 would
+	  have its frame off-screen on my monitor)
+        - the code takes the --shade and --outline options into
+	  account properly when wrapping, clearing text, etc. and so
+	  no 'debris' pixels are left behind any more.
 
 0.9  Wed Feb 25 15:25:49 CET 2004
 	- unsigned/fseek bug fix by (mmj@panther.mmj.dk).

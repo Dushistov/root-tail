@@ -41,6 +41,9 @@
 #include <regex.h>
 #endif
 
+#define SHADE_X 2
+#define SHADE_Y 2
+
 /* data structures */
 struct logfile_entry
 {
@@ -70,6 +73,8 @@ struct linematrix *lines;
 int width = STD_WIDTH, height = STD_HEIGHT, listlen;
 int win_x = LOC_X, win_y = LOC_Y;
 int font_ascent, font_height;
+int effect_x_space, effect_y_space; /* how much space does shading / outlining take up */
+int effect_x_offset, effect_y_offset; /* and how does it offset the usable space */
 int do_reopen;
 struct timeval interval = { 2, 400000 };
 XFontSet fontset;
@@ -299,7 +304,34 @@ InitWindow (void)
   if (geom_mask & YNegative)
     win_y = win_y + ScreenHeight - height;
 
-  listlen = height / font_height;
+  if (opt_outline)
+    {
+      /* adding outline increases the total width and height by 2
+	 pixels each, and offsets the text one pixel right and one
+	 pixel down */
+      effect_x_space = effect_y_space = 2;
+      effect_x_offset = effect_y_offset = 1;
+    }
+  else if (opt_shade)
+    {
+      /* adding a shadow increases the space used */
+      effect_x_space = abs(SHADE_X);
+      effect_y_space = abs(SHADE_Y);
+      /* if the shadow is to the right and below then we don't need
+       * to move the text to make space for it, but shadows to the left
+       * and above need accomodating */
+      effect_x_offset = SHADE_X > 0 ? 0 : -SHADE_X;
+      effect_y_offset = SHADE_Y > 0 ? 0 : -SHADE_Y;
+    }
+  else
+    {
+      effect_x_space = effect_y_space = 0;
+      effect_x_offset = effect_y_offset = 0;
+    }
+
+  /* if we are using -shade or -outline, there will be less usable
+   * space for output */
+  listlen = (height - effect_y_space) / font_height;
 
   if (!listlen)
     {
@@ -308,8 +340,12 @@ InitWindow (void)
       listlen = 1;
     }
 
-  height = listlen * font_height;
-
+  /* leave the height how the user requested it.  it might not all be
+   * used, but this will allow the geometry to be tuned more accurately
+   * (with the -frame option)
+   * the old code did this:
+   *   height = listlen * font_height + effect_y_space; */
+  
   XSelectInput (disp, root, ExposureMask | FocusChangeMask);
 }
 
@@ -349,36 +385,41 @@ refresh (int miny, int maxy, int clear)
         continue;
 
       if (clear && opt_noflicker)
-        XClearArea (disp, root, win_x, win_y + offset - font_ascent, width, font_height, False);
+	XClearArea (disp, root, win_x, win_y + offset - font_height,
+		    width + effect_x_space, font_height + effect_y_space, False);
 
       if (opt_outline)
         {
+	  int x, y;
           XSetForeground (disp, WinGC, black_color);
-          XmbDrawString (disp, root, fontset, WinGC, win_x - 1,
-                         win_y + offset + 1, line->line, line->len);
-          XmbDrawString (disp, root, fontset, WinGC, win_x + 1,
-                         win_y + offset + 1, line->line, line->len);
-          XmbDrawString (disp, root, fontset, WinGC, win_x - 1,
-                         win_y + offset - 1, line->line, line->len);
-          XmbDrawString (disp, root, fontset, WinGC, win_x + 1,
-                         win_y + offset - 1, line->line, line->len);
+
+	  for (x = -1; x < 2; x += 2)
+	    for (y = -1; y < 2; y += 2)
+	      XmbDrawString (disp, root, fontset, WinGC,
+			     win_x + effect_x_offset + x,
+			     win_y + effect_y_offset + y + offset - font_height + font_ascent,
+			     line->line, line->len);
         }
       else if (opt_shade)
         {
           XSetForeground (disp, WinGC, black_color);
-          XmbDrawString (disp, root, fontset, WinGC, win_x + 2,
-                         win_y + offset + 2, line->line, line->len);
+          XmbDrawString (disp, root, fontset, WinGC,
+			 win_x + effect_x_offset + SHADE_X,
+                         win_y + effect_y_offset + offset + SHADE_Y - font_height + font_ascent,
+			 line->line, line->len);
         }
 
       XSetForeground (disp, WinGC, line->color);
-      XmbDrawString (disp, root, fontset, WinGC, win_x, win_y + offset,
+      XmbDrawString (disp, root, fontset, WinGC,
+		     win_x + effect_x_offset,
+		     win_y + effect_y_offset + offset - font_height + font_ascent,
                      line->line, line->len);
     }
 
   if (opt_frame)
     {
       XSetForeground (disp, WinGC, GetColor (def_color));
-      XDrawRectangle (disp, root, WinGC, win_x - 2, win_y - 2, width + 4, height + 4);
+      XDrawRectangle (disp, root, WinGC, win_x - 0, win_y - 0, width - 1, height - 1);
     }
 }
 
@@ -667,7 +708,7 @@ split_line (int idx, const char *str, unsigned long color)
 
 	  /* find the width in pixels of the next character */
           int cw = XmbTextEscapement (fontset, p, len);
-          if (cw + w >= width)
+          if (cw + w > width - effect_x_space)
 	    {
 	      wrapped = 1;
 	      break;
@@ -1024,6 +1065,7 @@ main (int argc, char *argv[])
                 perror (fname), exit (1);
 
               l = strlen (desc);
+	      /* HACK on this - width is in pixels now */
               if (l > width - 2)        /* must account for [ ] */
                 l = width - 2;
               e->desc = xmalloc (l + 1);
@@ -1053,6 +1095,13 @@ main (int argc, char *argv[])
   if (opt_partial && opt_whole)
     {
       fprintf (stderr, "Specify at most one of -partial and -whole\n");
+      exit (1);
+    }
+
+  /* HACK this - do we want to allow both -shade and -outline? */
+  if (opt_shade && opt_outline)
+    {
+      fprintf (stderr, "Specify at most one of -shade and -outline\n");
       exit (1);
     }
 
