@@ -1147,13 +1147,7 @@ main (int argc, char *argv[])
               if (openlog (e) == NULL)
                 perror (fname), exit (1);
 
-              l = strlen (desc);
-	      /* HACK-6: width is in pixels now */
-              if (l > width - 2)        /* must account for [ ] */
-                l = width - 2;
-              e->desc = xmalloc (l + 1);
-              memcpy (e->desc, desc, l);
-              *(e->desc + l) = '\0';
+              e->desc = xstrdup (desc);
             }
 
           e->color = GetColor (fcolor);
