@@ -1,0 +1,47 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+
+D=`pwd`/debian/root-tail
+
+build: build-stamp
+
+build-stamp:
+	dh_testdir
+	$(MAKE) root-tail
+	touch build-stamp
+
+clean: 
+	dh_testroot
+	dh_testdir
+	$(MAKE) -i clean
+	rm -f build-stamp
+	dh_clean
+
+install: build 
+	dh_testroot
+	dh_testdir
+	dh_installdirs  
+	install root-tail $D/usr/bin/ 
+
+binary-indep:
+
+binary-arch: install 
+	dh_testdir
+	dh_testroot
+	dh_installdocs README
+	dh_installchangelogs Changes
+	dh_installman root-tail.man
+	dh_strip
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+
+.PHONY: build clean binary-arch binary install

@@ -1,0 +1,95 @@
+root-tail (0.2-1) unstable; urgency=low
+
+  * New upstream version
+  * Updated to Standards Version 3.6.1
+
+ -- Stephen Gran <sgran@debian.org>  Sun, 10 Aug 2003 15:59:20 -0400
+
+root-tail (0.1.0-4) unstable; urgency=low
+
+  * New Maintainer
+  * Updated to latest policy
+
+ -- Stephen Gran <steve@lobefin.net>  Sun, 20 Oct 2002 21:54:41 -0400
+
+root-tail (0.1.0-3) unstable; urgency=low
+
+  * Delete stray pixels on the right side (Closes: #130728)
+
+ -- Marco d'Itri <md@linux.it>  Sat, 26 Jan 2002 14:28:18 +0100
+
+root-tail (0.1.0-2) unstable; urgency=medium
+
+  * Added conflict with webrt (<= 1.0.6-3).
+  * Added support for named pipes.
+
+ -- Marco d'Itri <md@linux.it>  Wed,  9 Jan 2002 19:27:22 +0100
+
+root-tail (0.1.0-1) unstable; urgency=medium
+
+  * New maintainer, new upstream maintainer (Closes: #119989).
+  * The source code is now readable.
+  * Updated to latest policy.
+  * Fixed some small bugs and added some features, updated man page.
+  * Text is redrawed when using SIGUSR2.
+  * Added -reverse and -no-filename options.
+  * Open files are reopened if renamed.
+  * Open files are seeked to start if truncated (Closes: #116580).
+
+ -- Marco d'Itri <md@linux.it>  Fri, 21 Dec 2001 19:06:28 +0100
+
+root-tail (0.0.10-3) unstable; urgency=low
+
+  * Fixed build-depends. (Closes: #101228)
+  * Now root-tail works with log rotation, thanks Erwan. (Closes: #101444) 
+
+ -- Peter Novodvorsky <nidd@debian.org>  Sun,  1 Jul 2001 00:02:30 +0400
+
+root-tail (0.0.10-2) unstable; urgency=low
+
+  * Fixed default geomerty as Wichert requested. Now 160x20.
+  	(Closes: Bug#41414)
+
+ -- Peter Novodvorsky <nidd@debian.org>  Fri, 15 Jun 2001 02:26:18 +0400
+
+root-tail (0.0.10-1) unstable; urgency=low
+
+  * Changed name from rt to root-tail.
+  * New version, new maintainer, cleaned up with more feaures
+    (Closes: #23584, #26191, #28503, #31221, #41411, #41412,
+             #41413, #41415, #91058, #91630, #93878) 
+
+ -- Peter Novodvorsky <nidd@debian.org>  Sat, 14 Apr 2001 01:10:48 +0400
+
+rt (mbm0606-1.2) frozen unstable; urgency=low
+
+  * Non-maintainer upload.
+  * debian/control (Maintainer): valid address.
+  * debian/menu: remove "icon=none".
+  * debian/menu: we are "rt", not "Rt".
+  * debian/menu: correct section to "Apps/System" as opposed to "system".
+  * debian/*.ex: dh_make cruft; removed.
+  * debian/dirs: removed unused usr/sbin.
+
+ -- James Troup <james@nocrew.org>  Sun, 25 Oct 1998 05:55:14 +0000
+
+rt (mbm0606-1.1) unstable; urgency=low
+
+  * non-maintainer (binary-only) upload for Alpha
+  * changed YAFHC i386 architecture to 'any'
+  * changed -L/usr/X11/lib to -L/usr/X11R6/lib
+  * current was unused at rt.c:533 because all uses were commented out
+
+ -- Paul Slootman <paul@debian.org>  Mon,  7 Sep 1998 22:29:37 +0200
+
+rt (mbm0606-1) unstable; urgency=low
+
+  * Fixes 'lack of copyright' bug (bug #many of them)
+
+ -- Kevin Poorman <ewigin@softhome.net>  Sat, 25 Jul 1998 22:53:23 -0500
+
+rt (0.4-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Kevin Poorman <ewigin@softhome.net>  Tue, 19 May 1998 22:53:23 -0500

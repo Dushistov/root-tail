@@ -1,0 +1,15 @@
+Source: root-tail
+Section: x11
+Priority: optional
+Maintainer: Stephen Gran <sgran@debian.org>
+Build-Depends: debhelper (>=4.0), xlibs-dev
+Standards-Version: 3.6.1
+
+Package: root-tail
+Replaces: rt
+Conflicts: rt (<= mbm0606-1.2), webrt (<= 1.0.6-3)
+Architecture: any
+Depends: ${shlibs:Depends}
+Description: Displays select log files in the X root window
+ Root-tail, is a program that displays one or more log files, 
+ on the X root window, through the use of transparent windows.

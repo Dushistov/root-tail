@@ -1,0 +1,46 @@
+Current package maintainer is Stephen Gran <sgran@debian.org>.
+Current upstream author is Marc Lehmann <pcg@goof.com>, 
+http://root-tail.plan9.de/
+
+This package was redebianized by Peter Novodvorsky <nidd@debian.org> on
+Sat, 14 Apr 2001 01:03:40 +0400.
+Previous package was made by Ender ewigin@petra and maintained by
+Kevin Poorman.
+
+AUTHORS                                                                         
+                                                                                
+   Please tell me if I left anybody out.                                        
+                                                                               
+   Mike Baker <mjbaker@mtu.edu>         original author                         
+   Ivo van der Wijk <irvdwijk@cs.vu.nl> co-author                               
+   Marc Lehmann <pcg@goof.com>          optimized refresh                       
+   Olexij Tkatchenko <ot@parcs.de>      correct refresh ;)                      
+   Daniel Lowe <ashe@sanctuary.org>     many small improvements                 
+   andre@aleph.it                       signal handling                         
+   Marco D'Itri				many fixes                                                                                  
+   Here is a list of all (since I started this list) people that helped by      
+   diagnosing a bug:                                                            
+			                                                                                   
+   Gunnar Ritter <g-r@bigfoot.de>                                               
+   Kevin Bryan <kbry1257@postoffice.uri.edu>                                    
+   Eric Thompson <thompe2@rpi.edu>                                              
+
+Copyright:
+
+This program is free software; you can redistribute it and/or modify it         
+under the terms of the GNU General Public License as published by the           
+Free Software Foundation; either version 2, or (at your option) any             
+later version.                                                                  
+                                                                                
+This program is distributed in the hope that it will be useful,                 
+but WITHOUT ANY WARRANTY; without even the implied warranty of                  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                   
+GNU General Public License for more details.                                    
+                                                                                
+You should have received a copy of the GNU General Public License               
+along with this program; if not, write to the Free Software                     
+Foundation, 59 Temple Place - Suite 330,                                        
+Boston, MA 02111-1307, USA.                                                     
+                                                                                
+On Debian GNU/Linux systems, the complete text of the GNU General               
+Public License can be found in `/usr/share/common-licenses/GPL'.                
