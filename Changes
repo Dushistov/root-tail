@@ -1,5 +1,16 @@
-0.21
+1.0
+
+	- strict-aliasing fix suggested by mmj.
+
+0.9  Wed Feb 25 15:25:49 CET 2004
 	- unsigned/fseek bug fix by (mmj@panther.mmj.dk).
+        - patch by Didier Verna <didier@lrde.epita.fr> (2004-01-07)
+            * root-tail.c (root_window): New function. Return the real
+            root window, or the virtual one if any.
+            (InitWindow): Use it.
+            (force_refresh): Clear the root-tail area, not the whole window.
+            (blank_window): Ditto.
+            (main_loop): Don't forget to redraw () the initial contents.
 
 0.2  Wed Sep  4 17:20:57 CEST 2002
 	- applied patch by ami@fischman.org (tac).

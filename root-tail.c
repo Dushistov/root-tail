@@ -30,10 +30,12 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <locale.h>
 #if HAS_REGEX
 #include <regex.h>
 #endif
 #include <X11/Xlib.h>
+#include <X11/Xatom.h>
 #include <X11/Xutil.h>
 
 /* data structures */
@@ -59,6 +61,7 @@ int win_x = LOC_X, win_y = LOC_Y;
 int w = -1, h = -1, font_width, font_height, font_descent;
 int do_reopen;
 struct timeval interval = { 2, 400000 };	/* see Knuth */
+XFontSet fontset;
 
 /* command line options */
 int opt_noinitial, opt_shade, opt_frame, opt_reverse, opt_nofilename,
@@ -124,13 +127,13 @@ void force_reopen(int dummy)
 
 void force_refresh(int dummy)
 {
-    XClearWindow(disp, root);
+    XClearArea(disp, root, win_x, win_y, w, h + font_descent + 2, False);
     redraw();
 }
 
 void blank_window(int dummy)
 {
-    XClearWindow(disp, root);
+    XClearArea(disp, root, win_x, win_y, w, h + font_descent + 2, False);
     XFlush(disp);
     exit(0);
 }
@@ -150,6 +153,65 @@ unsigned long GetColor(const char *ColorName)
     return Color.pixel;
 }
 
+static Window root_window (Display *display, int screen_number)
+{
+  Atom __SWM_VROOT = XInternAtom (display, "__SWM_VROOT", False);
+  Window real_root_window = RootWindow (display, screen_number);
+
+  if (__SWM_VROOT != None)
+    {
+      Window unused, *windows;
+      unsigned int count;
+
+      if (XQueryTree (display, real_root_window, &unused, &unused, &windows,
+		      &count))
+	{
+	  int i;
+
+	  for (i = 0; i < count; i++)
+	    {
+	      Atom type;
+	      int format;
+	      unsigned long nitems, bytes_after_return;
+	      unsigned char *virtual_root_window;
+
+	      if (XGetWindowProperty (display, windows[i], __SWM_VROOT,
+				      0, 1, False, XA_WINDOW, &type, &format,
+				      &nitems, &bytes_after_return,
+				      &virtual_root_window)
+		  == Success)
+		{
+		  if (type != None)
+		    {
+		      if (type == XA_WINDOW)
+			{
+			  XFree (windows);
+			  return (Window)virtual_root_window;
+			}
+		      else
+			fprintf (stderr, "__SWM_VROOT property type mismatch");
+		    }
+		}
+	      else
+		fprintf (stderr,
+			 "failed to get __SWM_VROOT property on window 0x%lx",
+			 windows[i]);
+	    }
+
+	  if (count)
+	    XFree (windows);
+	}
+      else
+	fprintf (stderr, "Can't query tree on root window 0x%lx",
+		 real_root_window);
+    }
+  else
+    /* This shouldn't happen. The Xlib documentation is wrong BTW. */
+    fprintf (stderr, "Can't intern atom __SWM_VROOT");
+
+  return real_root_window;
+}
+
 void InitWindow(void)
 {
     XGCValues gcv;
@@ -165,7 +227,7 @@ void InitWindow(void)
     screen = DefaultScreen(disp);
     ScreenHeight = DisplayHeight(disp, screen);
     ScreenWidth = DisplayWidth(disp, screen);
-    root = RootWindow(disp, screen);
+    root = root_window (disp, screen);
     gcm = GCBackground;
     gcv.graphics_exposures = True;
     WinGC = XCreateGC(disp, root, gcm, &gcv);
@@ -189,7 +251,7 @@ void InitWindow(void)
     XSelectInput(disp, root, ExposureMask|FocusChangeMask);
 }
 
-char * 
+char *
 detabificate (char *s)
 {
   char * out;
@@ -197,16 +259,16 @@ detabificate (char *s)
 
   out = malloc (8 * strlen (s) + 1);
 
-  for(i = 0, j = 0; s[i]; i++) 
+  for(i = 0, j = 0; s[i]; i++)
     {
-      if (s[i] == '\t') 
-        do 
+      if (s[i] == '\t')
+        do
           out[j++] = ' ';
-        while (j % 8);      
+        while (j % 8);
       else
         out[j++] = s[i];
     }
-  
+
   out[j] = '\0';
   return out;
 }
@@ -234,26 +296,33 @@ void refresh(struct linematrix *lines, int miny, int maxy)
     for (lin = listlen; lin--;)
       {
         char *temp;
-  
+
         offset -= font_height;
-  
+
         if (offset < miny || offset > maxy)
           continue;
 
 #define LIN ((opt_reverse)?(listlen-lin-1):(lin))
         temp = detabificate (lines[LIN].line);
-  
+
         if (opt_shade)
           {
             XSetForeground (disp, WinGC, black_color);
+#if 0
+            XmbDrawString (disp, root, fontset, WinGC, win_x + 2, win_y + offset + 2,
+                           temp, strlen (temp));
+#endif
             XDrawString (disp, root, WinGC, win_x + 2, win_y + offset + 2,
                          temp, strlen (temp));
           }
-  
+
         XSetForeground (disp, WinGC, lines[LIN].color);
+#if 0
+        XmbDrawString (disp, root, fontset, WinGC, win_x, win_y + offset,
+  		       temp, strlen (temp));
+#endif
         XDrawString (disp, root, WinGC, win_x, win_y + offset,
-  		   temp, strlen (temp));
-        
+  		     temp, strlen (temp));
         free (temp);
     }
 
@@ -293,7 +362,7 @@ void transform_line(char *s)
 
 /*
  * This routine should read 'width' characters and not more. However,
- * we really want to read width + 1 charachters if the last char is a '\n',
+ * we really want to read width + 1 characters if the last char is a '\n',
  * which we should remove afterwards. So, read width+1 chars and ungetc
  * the last character if it's not a newline. This means 'string' must be
  * width + 2 wide!
@@ -440,11 +509,15 @@ void main_loop(void)
     }
 
     if (!opt_noinitial)
+      {
 	while (lineinput(buf, buflen, loglist->fp) != 0) {
 	    SCROLL_UP(lines, listlen);
 	    /* print the next line */
 	    strcpy(lines[listlen - 1].line, buf);
 	}
+
+	redraw ();
+      }
 
     for (;;) {
 	int need_update = 0;
@@ -552,6 +625,8 @@ int main(int argc, char *argv[])
 #if HAS_REGEX
     char *transform = NULL;
 #endif
+
+    setlocale (LC_CTYPE, ""); /* try to initialize the locale. */
 
     /* window needs to be initialized before colorlookups can be done */
     /* just a dummy to get the color lookups right */
@@ -770,4 +845,3 @@ int daemonize(void) {
 
     return 0;
 }
-
