@@ -13,7 +13,10 @@ all: root-tail man
 
 root-tail: root-tail.c config.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
-man:
+
+man: root-tail.1.gz
+
+root-tail.1.gz: root-tail.man
 	cp root-tail.man root-tail.1
 	gzip -f9 root-tail.1
 
